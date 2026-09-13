@@ -11,6 +11,14 @@
     if(S.events.length&&!S.events.some(e=>e.id===S.match))S.match=S.events[0].id;
     render();
   }
+  window.osgbCreateEvent=async function(payload){
+    if(!client||!user)throw new Error('Sessione non valida');
+    const row={...payload,owner_user_id:user.id};
+    const {data,error}=await client.from('events').insert(row).select('id').single();
+    if(error)throw error;
+    await loadEvents();
+    return data;
+  };
   window.addEventListener('osgb-auth-ready',async e=>{
     client=e.detail?.client;if(!client)return;
     const {data}=await client.auth.getUser();user=data?.user||null;
