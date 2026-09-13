@@ -3,12 +3,14 @@
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
+  const TO_DB={p:'present',a:'absent',l:'late',u:'unavailable'};
+  const TO_UI={present:'p',absent:'a',late:'l',unavailable:'u'};
 
   async function ensureEvent(date){
-    const {data:found,error}=await client.from('events').select('id').eq('owner_user_id',user.id).eq('event_date',date).eq('event_type','Allenamento').order('created_at',{ascending:true}).limit(1);
+    const {data:found,error}=await client.from('events').select('id').eq('owner_user_id',user.id).eq('event_date',date).eq('event_type','training').order('created_at',{ascending:true}).limit(1);
     if(error)throw error;
     if(found?.length)return found[0].id;
-    const {data:created,error:ce}=await client.from('events').insert({owner_user_id:user.id,event_date:date,event_type:'Allenamento',title:'Allenamento'}).select('id').single();
+    const {data:created,error:ce}=await client.from('events').insert({owner_user_id:user.id,event_date:date,event_type:'training',title:'Allenamento'}).select('id').single();
     if(ce)throw ce;
     return created.id;
   }
@@ -19,7 +21,7 @@
     const {data,error}=await client.from('attendance').select('player_id,status').eq('event_id',eventId);
     if(error)throw error;
     S.pres={};
-    (data||[]).forEach(r=>S.pres[r.player_id]=r.status);
+    (data||[]).forEach(r=>S.pres[r.player_id]=TO_UI[r.status]||r.status);
     ready=true;
     if(S.r==='pres')render();
   }
@@ -27,7 +29,7 @@
   window.setPres=async function(id,v){
     if(!client||!user||!eventId)return;
     const old=S.pres[id];S.pres[id]=v;render();
-    const {error}=await client.from('attendance').upsert({owner_user_id:user.id,event_id:eventId,player_id:id,status:v,updated_at:new Date().toISOString()},{onConflict:'event_id,player_id'});
+    const {error}=await client.from('attendance').upsert({owner_user_id:user.id,event_id:eventId,player_id:id,status:TO_DB[v]||v,updated_at:new Date().toISOString()},{onConflict:'event_id,player_id'});
     if(error){if(old===undefined)delete S.pres[id];else S.pres[id]=old;render();alert('Impossibile salvare la presenza. Riprova.');}
   };
 
@@ -38,7 +40,7 @@
 
   window.markAllPresent=async function(){
     if(!client||!user||!eventId)return;
-    const rows=P.map(p=>({owner_user_id:user.id,event_id:eventId,player_id:p.id,status:'p',updated_at:new Date().toISOString()}));
+    const rows=P.map(p=>({owner_user_id:user.id,event_id:eventId,player_id:p.id,status:'present',updated_at:new Date().toISOString()}));
     const {error}=await client.from('attendance').upsert(rows,{onConflict:'event_id,player_id'});
     if(error){alert('Impossibile salvare le presenze.');return}
     rows.forEach(r=>S.pres[r.player_id]='p');render();
