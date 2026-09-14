@@ -30,7 +30,7 @@
       const e=attEv[0];
       const {data:a}=await client.from('attendance').select('status').eq('event_id',e.id);
       const rows=a||[];
-      const present=rows.filter(x=>x.status==='present').length;
+      const present=rows.filter(x=>x.status==='present'||x.status==='late').length;
       dash.lastAttendance={date:e.event_date,present,total:P.length};
     }
     if(S.r==='home')render();
@@ -44,7 +44,7 @@
   window.home=function(){
     const nt=dash.nextTraining;
     const a=dash.lastAttendance;
-    const s=window.osgbSeasonStats||{trainings:0,matches:0,blu:0,gialla:0,minutes:0,attendanceAvg:null};
+    const s=window.osgbSeasonStats||{trainings:0,matches:0,blu:0,gialla:0,minutes:0,attendanceAvg:null,played:0,wins:0,draws:0,losses:0,goalsFor:0,goalsAgainst:0};
     const attText=a?`${a.present}/${a.total}`:'—';
     const attPct=a&&a.total?Math.round(a.present/a.total*100):0;
     return `${ttl('Dashboard','OSGB Giussano · Scuola Calcio 2020')}
@@ -58,6 +58,8 @@
       <div class="grid g2"><div class="card"><b>Sedute salvate</b><div class="kpi">${dash.weekTrainings}</div></div><div class="card"><b>Minuti programmati</b><div class="kpi">${dash.weekMinutes}</div></div></div>
       <div class="section">STAGIONE 2026/2027</div>
       <div class="grid g4"><div class="card"><b>Allenamenti</b><div class="kpi">${s.trainings}</div><p class="muted">${s.minutes} min programmati</p></div><div class="card"><b>Gare totali</b><div class="kpi">${s.matches}</div></div><div class="card"><b>BLU / GIALLA</b><div class="kpi">${s.blu}/${s.gialla}</div></div><div class="card"><b>Presenza media</b><div class="kpi">${s.attendanceAvg==null?'—':s.attendanceAvg+'%'}</div></div></div>
+      <div class="section">RISULTATI STAGIONE</div>
+      <div class="grid g4"><div class="card"><b>Gare con risultato</b><div class="kpi">${s.played}</div></div><div class="card"><b>V / N / P</b><div class="kpi">${s.wins}/${s.draws}/${s.losses}</div></div><div class="card"><b>Gol fatti</b><div class="kpi">${s.goalsFor}</div></div><div class="card"><b>Gol subiti</b><div class="kpi">${s.goalsAgainst}</div></div></div>
       <div class="section">AZIONI RAPIDE</div>
       <div class="quick"><button onclick="go('pres')"><span class="qi"><i data-lucide="clipboard-check"></i></span>Segna presenze</button><button onclick="trainingWizard()"><span class="qi"><i data-lucide="sparkles"></i></span>Crea allenamento</button><button onclick="newMatch()"><span class="qi"><i data-lucide="calendar-plus"></i></span>Nuova partita</button><button onclick="messages()"><span class="qi"><i data-lucide="message-circle"></i></span>Messaggi WhatsApp</button></div>`;
   };
