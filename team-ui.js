@@ -18,8 +18,7 @@
     for(const r of (data||[])){
       const s=next[r.player_id]||(next[r.player_id]=empty());
       if(r.status==='present')s.present++; else if(r.status==='absent')s.absent++; else if(r.status==='late')s.late++; else if(r.status==='unavailable')s.unavailable++;
-      s.total++;
-      s.history.push({status:r.status,date:r.events?.event_date||r.updated_at,title:r.events?.title||'Allenamento'});
+      s.total++;s.history.push({status:r.status,date:r.events?.event_date||r.updated_at,title:r.events?.title||'Allenamento'});
     }
     for(const p of P){const s=next[p.id]||empty();s.pct=s.total?Math.round((s.present+s.late)/s.total*100):0;p.pct=s.pct;}
     stats=next;if(S.r==='team')render();
@@ -27,13 +26,7 @@
 
   function visiblePlayers(){
     let list=P.filter(p=>String(p.n||'').toLowerCase().includes(rosterQuery.toLowerCase().trim()));
-    list=[...list].sort((a,b)=>{
-      const sa=stats[a.id]||empty(),sb=stats[b.id]||empty();
-      if(rosterSort==='pct-desc')return sb.pct-sa.pct||String(a.n).localeCompare(String(b.n),'it');
-      if(rosterSort==='pct-asc')return sa.pct-sb.pct||String(a.n).localeCompare(String(b.n),'it');
-      if(rosterSort==='absences')return sb.absent-sa.absent||String(a.n).localeCompare(String(b.n),'it');
-      return String(a.n).localeCompare(String(b.n),'it');
-    });
+    list=[...list].sort((a,b)=>{const sa=stats[a.id]||empty(),sb=stats[b.id]||empty();if(rosterSort==='pct-desc')return sb.pct-sa.pct||String(a.n).localeCompare(String(b.n),'it');if(rosterSort==='pct-asc')return sa.pct-sb.pct||String(a.n).localeCompare(String(b.n),'it');if(rosterSort==='absences')return sb.absent-sa.absent||String(a.n).localeCompare(String(b.n),'it');return String(a.n).localeCompare(String(b.n),'it');});
     return list;
   }
 
@@ -41,10 +34,8 @@
   window.setRosterSort=function(v){rosterSort=v||'name';render();};
 
   window.team=function(){
-    const a=S.asg[S.match]||{};
-    const assigned=Object.values(a).filter(Boolean).length;
-    const list=visiblePlayers();
-    const rows=list.length?list.map((p)=>{const s=stats[p.id]||empty();return `<div class="player" onclick='openPlayerStats(${JSON.stringify(String(p.id))})' style="cursor:pointer"><div class="av">${p.seq||P.indexOf(p)+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${esc(profile(p))} · Presenze ${s.pct}%</small></div><span class="pill ${a[p.id]==='GIALLA'?'yellow':''}">${esc(a[p.id]||'Non assegnato')}</span></div>`;}).join(''):`<p class="muted">Nessun giocatore trovato.</p>`;
+    const a=S.asg[S.match]||{};const assigned=Object.values(a).filter(Boolean).length;const list=visiblePlayers();
+    const rows=list.length?list.map(p=>{const s=stats[p.id]||empty();return `<div class="player" onclick='openPlayerStats(${JSON.stringify(String(p.id))})' style="cursor:pointer"><div class="av">${p.seq||P.indexOf(p)+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${esc(profile(p))} · Presenze ${s.pct}%</small></div><span class="pill ${a[p.id]==='GIALLA'?'yellow':''}">${esc(a[p.id]||'Non assegnato')}</span></div>`;}).join(''):`<p class="muted">Nessun giocatore trovato.</p>`;
     return `${ttl('Squadra',`${P.length} bambini · BLU e GIALLA dinamiche per ogni gara`)}<div class="grid g3"><div class="card"><div class="muted">ROSA</div><div class="kpi">${P.length}</div></div><div class="card"><div class="muted">ASSEGNATI ORA</div><div class="kpi">${assigned}</div></div><div class="card"><div class="muted">NON ASSEGNATI</div><div class="kpi">${Math.max(0,P.length-assigned)}</div></div></div><div class="card" style="margin-top:12px"><p class="muted">Le squadre vengono composte per ogni singola gara. Il profilo di sviluppo serve solo a bilanciare i gruppi, non a creare classifiche.</p><button class="btn" onclick="go('builder')"><i data-lucide="users-round"></i>Componi BLU / GIALLA</button></div><div class="card" style="margin-top:12px"><div class="field"><label>Cerca giocatore</label><input value="${esc(rosterQuery)}" oninput="setRosterQuery(this.value)" placeholder="Nome o cognome"></div><div class="field"><label>Ordina</label><select onchange="setRosterSort(this.value)"><option value="name" ${rosterSort==='name'?'selected':''}>Nome</option><option value="pct-desc" ${rosterSort==='pct-desc'?'selected':''}>Presenza % decrescente</option><option value="pct-asc" ${rosterSort==='pct-asc'?'selected':''}>Presenza % crescente</option><option value="absences" ${rosterSort==='absences'?'selected':''}>Più assenze</option></select></div></div><div class="section">ROSA · ${list.length}</div>${rows}`;
   };
 
@@ -52,7 +43,7 @@
     const a=S.asg[S.match]||{},g={N:[],BLU:[],GIALLA:[]};P.forEach(p=>g[a[p.id]||'N'].push(p));
     const row=p=>`<div class="assign"><div class="av">${p.seq||P.indexOf(p)+1}</div><div style="flex:1"><b>${esc(p.n)}</b><br><small class="muted">${esc(profile(p))}</small></div><div class="acts"><button class="mb" onclick='asg(${JSON.stringify(String(p.id))},"BLU")'>BLU</button><button class="my" onclick='asg(${JSON.stringify(String(p.id))},"GIALLA")'>GIALLA</button><button class="mn" onclick='asg(${JSON.stringify(String(p.id))},null)'>×</button></div></div>`;
     const noMatch=!S.match?`<div class="card"><p class="muted">Apri prima una gara dal Calendario per comporre le squadre.</p><button class="btn alt" onclick="go('cal')">Vai al Calendario</button></div>`:'';
-    const actions=S.match?`<div class="card" style="margin-top:12px"><div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="openGuidedCallups()"><i data-lucide="scale"></i>Proposta equilibrata</button><button class="btn alt" onclick="assignAllBalanced()"><i data-lucide="shuffle"></i>Dividi tutti</button><button class="btn alt" onclick="clearCallups()"><i data-lucide="eraser"></i>Svuota</button></div><p class="muted" style="margin-top:10px">La proposta considera prima l’equità delle convocazioni e poi bilancia esperienza e livello tra BLU e GIALLA.</p></div>`:'';
+    const actions=S.match?`<div class="card" style="margin-top:12px"><div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="openGuidedCallups()"><i data-lucide="scale"></i>Proposta equilibrata</button><button class="btn alt" onclick="openQuickCallups()"><i data-lucide="list-checks"></i>Selezione rapida</button><button class="btn alt" onclick="assignAllBalanced()"><i data-lucide="shuffle"></i>Dividi tutti</button><button class="btn alt" onclick="clearCallups()"><i data-lucide="eraser"></i>Svuota</button></div><p class="muted" style="margin-top:10px">La proposta considera prima l’equità delle convocazioni e poi bilancia esperienza e livello tra BLU e GIALLA.</p></div>`:'';
     return `${ttl('BLU / GIALLA','Composizione dinamica della giornata')}${noMatch}${actions}<div class="grid g3"><div class="card"><b>BLU</b><div class="kpi">${g.BLU.length}</div></div><div class="card yellow"><b>GIALLA</b><div class="kpi">${g.GIALLA.length}</div></div><div class="card"><b>Non assegnati</b><div class="kpi">${g.N.length}</div></div></div><div class="card" style="margin-top:12px"><b>Non assegnati: ${g.N.length}</b>${g.N.map(row).join('')}</div><div class="builder" style="margin-top:12px"><div class="box b"><h3>BLU · ${g.BLU.length}</h3>${g.BLU.map(row).join('')}</div><div class="box y"><h3>GIALLA · ${g.GIALLA.length}</h3>${g.GIALLA.map(row).join('')}</div></div>`;
   };
 
