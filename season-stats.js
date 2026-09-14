@@ -16,7 +16,7 @@
     stats.gialla=games.filter(x=>x.team_color==='GIALLA').length;
     stats.minutes=(sessions||[]).reduce((n,x)=>n+(Number(x.duration_minutes)||0),0);
     const rows=attendance||[];
-    if(rows.length){const present=rows.filter(x=>x.status==='present').length;stats.attendanceAvg=Math.round(present/rows.length*100);}else stats.attendanceAvg=null;
+    if(rows.length){const attended=rows.filter(x=>x.status==='present'||x.status==='late').length;stats.attendanceAvg=Math.round(attended/rows.length*100);}else stats.attendanceAvg=null;
     window.osgbSeasonStats={...stats};
     if(S.r==='home'&&typeof window.home==='function')render();
   }
