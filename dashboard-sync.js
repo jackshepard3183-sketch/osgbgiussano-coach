@@ -44,6 +44,7 @@
   window.home=function(){
     const nt=dash.nextTraining;
     const a=dash.lastAttendance;
+    const s=window.osgbSeasonStats||{trainings:0,matches:0,blu:0,gialla:0,minutes:0,attendanceAvg:null};
     const attText=a?`${a.present}/${a.total}`:'—';
     const attPct=a&&a.total?Math.round(a.present/a.total*100):0;
     return `${ttl('Dashboard','OSGB Giussano · Scuola Calcio 2020')}
@@ -55,6 +56,8 @@
       </div>
       <div class="section">SETTIMANA CORRENTE</div>
       <div class="grid g2"><div class="card"><b>Sedute salvate</b><div class="kpi">${dash.weekTrainings}</div></div><div class="card"><b>Minuti programmati</b><div class="kpi">${dash.weekMinutes}</div></div></div>
+      <div class="section">STAGIONE 2026/2027</div>
+      <div class="grid g4"><div class="card"><b>Allenamenti</b><div class="kpi">${s.trainings}</div><p class="muted">${s.minutes} min programmati</p></div><div class="card"><b>Gare totali</b><div class="kpi">${s.matches}</div></div><div class="card"><b>BLU / GIALLA</b><div class="kpi">${s.blu}/${s.gialla}</div></div><div class="card"><b>Presenza media</b><div class="kpi">${s.attendanceAvg==null?'—':s.attendanceAvg+'%'}</div></div></div>
       <div class="section">AZIONI RAPIDE</div>
       <div class="quick"><button onclick="go('pres')"><span class="qi"><i data-lucide="clipboard-check"></i></span>Segna presenze</button><button onclick="trainingWizard()"><span class="qi"><i data-lucide="sparkles"></i></span>Crea allenamento</button><button onclick="newMatch()"><span class="qi"><i data-lucide="calendar-plus"></i></span>Nuova partita</button><button onclick="messages()"><span class="qi"><i data-lucide="message-circle"></i></span>Messaggi WhatsApp</button></div>`;
   };
