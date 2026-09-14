@@ -1,1 +1,12 @@
-(function(){if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker non registrato',err));});}})();
+(function(){
+  let installPrompt=null;
+  function addStyle(){if(document.getElementById('pwaStyle'))return;const s=document.createElement('style');s.id='pwaStyle';s.textContent='.pwa-install,.offline-badge{border:0;border-radius:999px;padding:8px 10px;font:inherit;font-weight:700}.pwa-install{background:#f4d018;color:#173c7a;cursor:pointer}.offline-badge{background:#fff3cd;color:#7a5a00;display:none;margin-left:6px}.offline-badge.on{display:inline-flex}';document.head.appendChild(s)}
+  function installButton(){if(document.getElementById('installCoach'))return document.getElementById('installCoach');const badge=document.querySelector('.top-badge');if(!badge)return null;const b=document.createElement('button');b.id='installCoach';b.className='pwa-install';b.textContent='Installa app';b.style.display='none';b.onclick=async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;b.style.display='none'};badge.insertAdjacentElement('afterend',b);return b}
+  function offlineBadge(){if(document.getElementById('offlineCoach'))return document.getElementById('offlineCoach');const header=document.querySelector('.top');if(!header)return null;const span=document.createElement('span');span.id='offlineCoach';span.className='offline-badge';span.textContent='Offline';header.appendChild(span);return span}
+  function syncOnline(){const b=offlineBadge();if(b)b.classList.toggle('on',!navigator.onLine)}
+  addStyle();installButton();offlineBadge();syncOnline();
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;const b=installButton();if(b)b.style.display='inline-flex'});
+  window.addEventListener('appinstalled',()=>{installPrompt=null;const b=document.getElementById('installCoach');if(b)b.style.display='none'});
+  window.addEventListener('online',syncOnline);window.addEventListener('offline',syncOnline);
+  if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker non registrato',err));});}
+})();
