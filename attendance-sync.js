@@ -6,6 +6,12 @@
   const TO_DB={p:'present',a:'absent',l:'late',u:'unavailable'};
   const TO_UI={present:'p',absent:'a',late:'l',unavailable:'u'};
 
+  async function refreshDerived(){
+    if(typeof window.osgbReloadPlayerStats==='function')await window.osgbReloadPlayerStats();
+    if(typeof window.osgbReloadSeasonStats==='function')await window.osgbReloadSeasonStats();
+    if(typeof window.osgbReloadDashboard==='function')await window.osgbReloadDashboard();
+  }
+
   async function ensureEvent(date){
     const {data:found,error}=await client.from('events').select('id').eq('owner_user_id',user.id).eq('event_date',date).eq('event_type','training').order('created_at',{ascending:true}).limit(1);
     if(error)throw error;
@@ -30,7 +36,8 @@
     if(!client||!user||!eventId)return;
     const old=S.pres[id];S.pres[id]=v;render();
     const {error}=await client.from('attendance').upsert({owner_user_id:user.id,event_id:eventId,player_id:id,status:TO_DB[v]||v,updated_at:new Date().toISOString()},{onConflict:'event_id,player_id'});
-    if(error){if(old===undefined)delete S.pres[id];else S.pres[id]=old;render();alert('Impossibile salvare la presenza. Riprova.');}
+    if(error){if(old===undefined)delete S.pres[id];else S.pres[id]=old;render();alert('Impossibile salvare la presenza. Riprova.');return;}
+    await refreshDerived();
   };
 
   window.setAttendanceDate=async function(v){
@@ -44,6 +51,7 @@
     const {error}=await client.from('attendance').upsert(rows,{onConflict:'event_id,player_id'});
     if(error){alert('Impossibile salvare le presenze.');return}
     rows.forEach(r=>S.pres[r.player_id]='p');render();
+    await refreshDerived();
   };
 
   window.pres=function(){
