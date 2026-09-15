@@ -73,7 +73,8 @@ th,td{padding:7px 8px;vertical-align:top}
   .title{font-size:29px}
   .sub{font-size:11.5px;margin-bottom:14px}
   .section{font-size:20px;margin:17px 0 8px}
-  .g4,.g2{grid-template-columns:1fr}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g2{grid-template-columns:1fr}
   .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
   .g3 .card{padding:9px}
   .g3 .card b{font-size:10px;line-height:1.15;display:block}
@@ -84,15 +85,19 @@ th,td{padding:7px 8px;vertical-align:top}
   .card{padding:11px;border-radius:12px}
   .card h3{font-size:14px}
   .kpi{font-size:25px}
+  .g4 .card b{font-size:10px;line-height:1.2;display:block}
+  .g4 .kpi{font-size:22px}
   .event{gap:8px;align-items:flex-start}
   .event strong{font-size:12.5px}
   .event small{font-size:10.5px}
   .date{min-width:47px;padding:6px;font-size:9.5px}
   .date b{font-size:16px}
   .event>.btn{font-size:11px;min-height:34px;padding:7px 8px}
-  .player{gap:8px;padding:8px 9px}
+  .player{gap:6px;padding:8px 8px}
   .player strong{font-size:12.5px}
   .player small{font-size:10.5px}
+  .player .sbtn{width:31px;height:31px;border-radius:8px}
+  .player .sbtn .icon{width:16px;height:16px}
   .pill{font-size:9.5px;padding:5px 8px}
   .btn{font-size:11.5px;min-height:35px;padding:8px 10px;border-radius:10px}
   .sheet{padding:12px;max-height:94dvh}
@@ -130,4 +135,5 @@ th,td{padding:7px 8px;vertical-align:top}
   .g3{grid-template-columns:1fr 1fr 1fr}
   .g3 .card b{font-size:9px}
   .g3 .kpi{font-size:20px}
+  .player .sbtn{width:29px;height:29px}
 }
