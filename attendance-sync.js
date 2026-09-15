@@ -1,10 +1,20 @@
 (function(){
-  let client=null,user=null,eventId=null,currentDate=new Date().toISOString().slice(0,10),ready=false;
+  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false;
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
   const TO_DB={p:'present',a:'absent',l:'late',u:'unavailable'};
   const TO_UI={present:'p',absent:'a',late:'l',unavailable:'u'};
+
+  function isoLocal(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
+  function defaultTrainingDate(){
+    const d=new Date();d.setHours(12,0,0,0);
+    const day=d.getDay();
+    if(day===2||day===4)return isoLocal(d);
+    while(d.getDay()!==2&&d.getDay()!==4)d.setDate(d.getDate()-1);
+    return isoLocal(d);
+  }
+  function isStandardTrainingDay(date){const d=new Date(date+'T12:00:00');return d.getDay()===2||d.getDay()===4;}
 
   async function refreshDerived(){
     if(typeof window.osgbReloadPlayerStats==='function')await window.osgbReloadPlayerStats();
@@ -20,7 +30,7 @@
 
   async function ensureEvent(date){
     const existing=await findEvent(date);if(existing)return existing;
-    const {data:created,error}=await client.from('events').insert({owner_user_id:user.id,event_date:date,event_type:'training',title:'Allenamento'}).select('id').single();
+    const {data:created,error}=await client.from('events').insert({owner_user_id:user.id,event_date:date,event_type:'training',title:'Allenamento',start_time:'18:00'}).select('id').single();
     if(error)throw error;
     return created.id;
   }
@@ -64,7 +74,8 @@
   window.pres=function(){
     let c={p:0,a:0,l:0,u:0};Object.values(S.pres||{}).forEach(x=>{if(c[x]!==undefined)c[x]++});
     const total=P.length;
-    return `${ttl('Presenze',`Allenamento · ${fmt(currentDate)}`)}<div class="card"><div class="field"><label>Data allenamento</label><input type="date" value="${currentDate}" onchange="setAttendanceDate(this.value)"></div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()"><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?(eventId?'Salvataggio automatico su Supabase.':'Nessuna presenza ancora registrata per questa data.'):'Caricamento presenze…'}</p></div><div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">GIOCATORI · ${total}</div>${P.map((p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`).join('')}`;
+    const standard=isStandardTrainingDay(currentDate);
+    return `${ttl('Presenze',`Allenamento · ${fmt(currentDate)} · 18:00–19:30`)}<div class="card"><div class="field"><label>Data allenamento</label><input type="date" value="${currentDate}" onchange="setAttendanceDate(this.value)"></div>${standard?'':`<p class="muted" style="margin-top:8px">Data fuori dal programma standard martedì/giovedì: verrà trattata come seduta straordinaria.</p>`}<div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()"><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?(eventId?'Salvataggio automatico su Supabase.':'Nessuna presenza ancora registrata per questa data.'):'Caricamento presenze…'}</p></div><div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">GIOCATORI · ${total}</div>${P.map((p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`).join('')}`;
   };
 
   window.addEventListener('osgb-auth-ready',async e=>{
