@@ -11,11 +11,26 @@
       <div class="field"><label>Campo / impianto</label><input id="matchVenue"></div>
       <div class="field"><label>Indirizzo</label><input id="matchAddress"></div>
       <div class="field"><label>Note</label><input id="matchNotes"></div>
-      <button class="btn" id="saveMatchBtn"><i data-lucide="save"></i>Salva gara</button>`);
-    document.getElementById('saveMatchBtn').onclick=saveMatchForm;
+      <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn alt" id="saveMatchBtn"><i data-lucide="save"></i>Salva gara</button>
+        <button class="btn" id="saveAndBuildMatchBtn"><i data-lucide="users-round"></i>Salva e componi BLU / GIALLA</button>
+      </div>`);
+    document.getElementById('saveMatchBtn').onclick=()=>saveMatchForm(false);
+    document.getElementById('saveAndBuildMatchBtn').onclick=()=>saveMatchForm(true);
   };
 
-  async function saveMatchForm(){
+  function setSaving(on){
+    const a=document.getElementById('saveMatchBtn'),b=document.getElementById('saveAndBuildMatchBtn');
+    [a,b].forEach(x=>{if(x)x.disabled=on;});
+    if(on){if(a)a.textContent='Salvataggio…';if(b)b.textContent='Salvataggio…';}
+    else{
+      if(a)a.innerHTML='<i data-lucide="save"></i>Salva gara';
+      if(b)b.innerHTML='<i data-lucide="users-round"></i>Salva e componi BLU / GIALLA';
+      if(typeof icons==='function')icons();
+    }
+  }
+
+  async function saveMatchForm(openBuilder){
     const date=document.getElementById('matchDate').value;
     const opponent=document.getElementById('matchOpponent').value.trim();
     if(!date||!opponent){alert('Inserisci almeno data e avversario.');return;}
@@ -34,12 +49,12 @@
       address:document.getElementById('matchAddress').value.trim()||null,
       notes:document.getElementById('matchNotes').value.trim()||null
     };
-    const btn=document.getElementById('saveMatchBtn');btn.disabled=true;btn.textContent='Salvataggio…';
+    setSaving(true);
     try{
       const data=await window.osgbCreateEvent(payload);
       closeM();
       S.match=data.id;
-      go('cal');
-    }catch(e){console.error(e);alert('Impossibile salvare la gara.');btn.disabled=false;btn.innerHTML='<i data-lucide="save"></i>Salva gara';icons();}
+      if(openBuilder)go('builder'); else go('cal');
+    }catch(e){console.error(e);alert('Impossibile salvare la gara.');setSaving(false);}
   }
 })();
