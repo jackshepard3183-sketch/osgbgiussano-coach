@@ -3,6 +3,7 @@ body{font-size:14px;line-height:1.42}
 .title{font-size:34px}
 .sub{font-size:13px;margin-bottom:16px}
 .section{font-size:23px;margin:20px 0 9px}
+.grid.g3,.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .card{padding:14px}
 .card h3{font-size:16px;line-height:1.2;margin-top:8px;margin-bottom:7px}
 .kpi{font-size:28px}
@@ -13,14 +14,17 @@ body{font-size:14px;line-height:1.42}
 .event{gap:9px;padding:10px 0}
 .event strong{font-size:13px;margin:4px 0 2px;line-height:1.28}
 .event small{font-size:11px;line-height:1.35}
-.date{min-width:50px;padding:7px;font-size:10px}
+.date{min-width:50px;border-radius:10px;padding:7px;font-size:10px}
 .date b{font-size:17px}
 .player{padding:9px 10px}
 .player strong{font-size:13px}
 .player small{font-size:11px}
 .av{width:35px;height:35px;font-size:12px}
 .tab{font-size:12px;padding:7px 10px}
-.assign{font-size:12px}
+.assign{font-size:12px;min-width:0}
+.assign>div:not(.acts){min-width:0;overflow-wrap:anywhere}
+.assign .acts{flex:0 0 auto}
+.assign button{font-size:10.5px;min-width:0}
 .box{min-height:190px}
 .nav{font-size:9px;padding:7px 2px}
 .nav .icon{width:19px;height:19px}
@@ -37,6 +41,9 @@ button,input,select,textarea{max-width:100%}
 img,svg{max-width:100%}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{padding:7px 8px;vertical-align:top}
+.login-brand h1{font-size:32px}
+.login-brand p{font-size:13px}
+.login-note{font-size:11.5px}
 
 @media(max-width:760px){
   main{padding:16px 12px 88px}
@@ -45,6 +52,7 @@ th,td{padding:7px 8px;vertical-align:top}
   .section{font-size:21px;margin-top:18px}
   .card{padding:12px}
   .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
   .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
   .quick{gap:8px;margin:10px 0 18px}
   .quick button{min-height:80px;padding:10px;font-size:12px}
@@ -66,6 +74,10 @@ th,td{padding:7px 8px;vertical-align:top}
   .sub{font-size:11.5px;margin-bottom:14px}
   .section{font-size:20px;margin:17px 0 8px}
   .g4,.g2{grid-template-columns:1fr}
+  .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g3 .card{padding:9px}
+  .g3 .card b{font-size:10px;line-height:1.15;display:block}
+  .g3 .kpi{font-size:22px}
   .quick{grid-template-columns:1fr 1fr}
   .quick button{min-height:76px;font-size:11.5px}
   .quick .qi{width:32px;height:32px;border-radius:9px}
@@ -95,8 +107,16 @@ th,td{padding:7px 8px;vertical-align:top}
   .bottom{padding-left:4px;padding-right:4px}
   .row{display:flex;flex-wrap:wrap;gap:6px!important}
   .row>.btn{flex:0 1 auto}
+  .assign{align-items:flex-start;padding:7px;gap:6px}
+  .assign .av{width:30px;height:30px;font-size:10px}
+  .assign .acts{gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:118px}
+  .assign button{padding:5px 6px;font-size:9.5px;border-radius:7px}
   textarea[id^="m"],textarea[id*="Message"]{min-height:190px!important}
   #diagramCanvas{min-width:0!important}
+  .login-card{padding:20px 16px}
+  .login-brand h1{font-size:28px}
+  .login-brand p{font-size:12px}
+  .login-note{font-size:11px}
 }
 
 @media(max-width:360px){
@@ -107,4 +127,7 @@ th,td{padding:7px 8px;vertical-align:top}
   .logout-btn{width:32px!important;height:32px!important}
   .quick{grid-template-columns:1fr 1fr}
   .btn{font-size:11px}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g3 .card b{font-size:9px}
+  .g3 .kpi{font-size:20px}
 }
