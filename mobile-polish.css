@@ -44,6 +44,13 @@ th,td{padding:7px 8px;vertical-align:top}
 .login-brand h1{font-size:32px}
 .login-brand p{font-size:13px}
 .login-note{font-size:11.5px}
+.exercise-source-image{display:block;width:100%;max-height:360px;object-fit:contain;margin-top:8px;border-radius:12px}
+.exercise-diagram-wrap{margin-top:8px;overflow:hidden;border-radius:12px}
+.saved-diagram{display:block;width:100%;height:auto;max-height:360px}
+.exercise-source-url{overflow-wrap:anywhere;word-break:break-word}
+.image-choice-hint{display:block;margin-top:5px;font-size:10px;line-height:1.35}
+#imgExerciseFile{background:#fff}
+#ocrExerciseStatus,#webImportStatus{font-size:11px;line-height:1.35}
 
 @media(max-width:760px){
   main{padding:16px 12px 88px}
@@ -117,7 +124,13 @@ th,td{padding:7px 8px;vertical-align:top}
   .assign .acts{gap:3px;flex-wrap:wrap;justify-content:flex-end;max-width:118px}
   .assign button{padding:5px 6px;font-size:9.5px;border-radius:7px}
   textarea[id^="m"],textarea[id*="Message"]{min-height:190px!important}
-  #diagramCanvas{min-width:0!important}
+  #diagramCanvas{min-width:0!important;width:100%!important;height:auto!important}
+  .saved-diagram{width:100%;height:auto;max-height:none}
+  .exercise-source-image{max-height:280px}
+  #ocrExerciseBtn{width:100%}
+  #imgExerciseFile{font-size:12px;padding:8px}
+  #webSourceText,#webDescription,#impDescription{min-height:150px!important}
+  .exercise-source-card,.exercise-diagram-card{padding:9px}
   .login-card{padding:20px 16px}
   .login-brand h1{font-size:28px}
   .login-brand p{font-size:12px}
