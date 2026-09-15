@@ -1,7 +1,7 @@
 (function(){
   let client=null;
   let dash={nextTraining:null,nextMatches:[],lastAttendance:null,weekTrainings:0,weekMinutes:0,rosterCount:0,rosterMissing:0,rosterLastSync:null};
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
   const fmtDate=d=>{if(!d)return'—';const [y,m,day]=String(d).split('-');return `${day}/${m}/${y}`};
   const fmtDateTime=v=>{if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});};
@@ -76,6 +76,7 @@
       <div class="grid g2"><div class="card"><b>Sedute salvate</b><div class="kpi">${dash.weekTrainings}</div></div><div class="card"><b>Minuti programmati</b><div class="kpi">${dash.weekMinutes}</div></div></div>
       <div class="section">STAGIONE 2026/2027</div>
       <div class="grid g4"><div class="card"><b>Allenamenti</b><div class="kpi">${s.trainings}</div><p class="muted">${s.minutes} min programmati</p></div><div class="card"><b>Gare totali</b><div class="kpi">${s.matches}</div></div><div class="card"><b>BLU / GIALLA</b><div class="kpi">${s.blu}/${s.gialla}</div></div><div class="card"><b>Presenza media</b><div class="kpi">${s.attendanceAvg==null?'—':s.attendanceAvg+'%'}</div></div></div>
+      <div style="margin-top:10px"><button class="btn alt" onclick="openSeasonReport()"><i data-lucide="file-chart-column"></i>Report stagione</button></div>
       <div class="section">AZIONI RAPIDE</div>
       <div class="quick"><button onclick="go('pres')"><span class="qi"><i data-lucide="clipboard-check"></i></span>Segna presenze</button><button onclick="trainingWizard()"><span class="qi"><i data-lucide="sparkles"></i></span>Crea allenamento</button><button onclick="newMatch()"><span class="qi"><i data-lucide="calendar-plus"></i></span>Nuova partita</button><button onclick="messages()"><span class="qi"><i data-lucide="message-circle"></i></span>Messaggi WhatsApp</button></div>`;
   };
