@@ -1,7 +1,7 @@
 (function(){
   let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false;
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
   const TO_DB={p:'present',a:'absent',l:'late',u:'unavailable'};
   const TO_UI={present:'p',absent:'a',late:'l',unavailable:'u'};
@@ -31,8 +31,12 @@
   async function ensureEvent(date){
     const existing=await findEvent(date);if(existing)return existing;
     const {data:created,error}=await client.from('events').insert({owner_user_id:user.id,event_date:date,event_type:'training',title:'Allenamento',start_time:'18:00'}).select('id').single();
-    if(error)throw error;
-    return created.id;
+    if(!error&&created?.id)return created.id;
+    if(error?.code==='23505'){
+      const concurrent=await findEvent(date);
+      if(concurrent)return concurrent;
+    }
+    throw error||new Error('Impossibile creare allenamento');
   }
 
   async function loadAttendance(date){
