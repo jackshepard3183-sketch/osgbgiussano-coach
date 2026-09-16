@@ -1,6 +1,6 @@
 (function(){
   let client=null;
-  const START='2026-09-01',END='2027-06-30';
+  const START='2026-09-10',END='2027-06-30';
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const csv=s=>`"${String(s??'').replace(/"/g,'""')}"`;
   const expLabel=v=>({first_year:'Primo anno',second_year:'Secondo anno',third_year:'Terzo anno'}[v]||'Da definire');
@@ -18,9 +18,10 @@
     const err=pe||ee||ae||ce||se;if(err)throw err;
     const pRows=players||[],aRows=attendance||[],cRows=callups||[],ev=events||[],tr=sessions||[];
     const games=ev.filter(x=>x.event_type!=='training');
+    const trainingDates=new Set(ev.filter(x=>x.event_type==='training'&&x.event_date).map(x=>String(x.event_date)));
     const team={
       players:pRows.length,
-      trainings:ev.filter(x=>x.event_type==='training').length,
+      trainings:trainingDates.size,
       sessions:tr.length,
       minutes:tr.reduce((n,x)=>n+(Number(x.duration_minutes)||0),0),
       matches:games.length,
