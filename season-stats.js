@@ -1,15 +1,16 @@
 (function(){
   let client=null,stats={trainings:0,matches:0,blu:0,gialla:0,minutes:0,attendanceAvg:null};
-  const seasonStart='2026-09-01',seasonEnd='2027-06-30';
+  const seasonStart='2026-09-10',seasonEnd='2027-06-30';
   async function loadStats(){
     if(!client)return;
     const [{data:events},{data:sessions},{data:attendance}]=await Promise.all([
-      client.from('events').select('id,event_type,team_color').gte('event_date',seasonStart).lte('event_date',seasonEnd),
-      client.from('training_sessions').select('duration_minutes').gte('session_date',seasonStart).lte('session_date',seasonEnd),
-      client.from('attendance').select('status')
+      client.from('events').select('id,event_date,event_type,team_color').gte('event_date',seasonStart).lte('event_date',seasonEnd),
+      client.from('training_sessions').select('duration_minutes,session_date').gte('session_date',seasonStart).lte('session_date',seasonEnd),
+      client.from('attendance').select('status,events!inner(event_date)').gte('events.event_date',seasonStart).lte('events.event_date',seasonEnd)
     ]);
     const ev=events||[];
-    stats.trainings=ev.filter(x=>x.event_type==='training').length;
+    const trainingDates=new Set(ev.filter(x=>x.event_type==='training'&&x.event_date).map(x=>String(x.event_date)));
+    stats.trainings=trainingDates.size;
     const games=ev.filter(x=>x.event_type!=='training');
     stats.matches=games.length;
     stats.blu=games.filter(x=>x.team_color==='BLU').length;
