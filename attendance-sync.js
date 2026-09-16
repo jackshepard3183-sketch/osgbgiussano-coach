@@ -1,7 +1,7 @@
 (function(){
   let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false;
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
   const TO_DB={p:'present',a:'absent',l:'late',u:'unavailable'};
   const TO_UI={present:'p',absent:'a',late:'l',unavailable:'u'};
