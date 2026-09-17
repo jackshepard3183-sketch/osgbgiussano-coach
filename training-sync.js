@@ -36,7 +36,7 @@
     const usable=lib.filter(x=>Number(x.duration_minutes)>0).map(x=>({...x,_score:scoreExercise(x,objective)})).sort((a,b)=>b._score-a._score);
     const blocks=[];let used=0;
     const warm=Math.min(total>=75?12:10,total);
-    blocks.push({order:1,title:'Attivazione ludico-motoria',duration_minutes:warm,source:'fallback'});used+=warm;
+    blocks.push({order:1,title:'Attivazione ludico-motoria',duration_minutes:warm,source:'ai',ai_generated:true,category:'Attivazione',objective:'Attivazione motoria',description:'Attivazione ludico-motoria generata automaticamente in base alla durata e alla struttura della seduta.'});used+=warm;
 
     if(coaches>=2&&players>=8&&total-used>=35){
       const stationCount=Math.min(3,coaches,players);
@@ -46,7 +46,7 @@
       const fallback=['Conduzione e dominio palla','Duelli 1 contro 1','Passaggio e collaborazione'];
       const stations=Array.from({length:stationCount},(_,i)=>{
         const ex=usable[i];
-        return ex?{station:i+1,group_size:groups[i],...exercisePayload(ex)}:{station:i+1,group_size:groups[i],title:fallback[i]||objective,exercise_id:null,category:'Blocco standard',objective,space:null,equipment:null,description:null,variants:null};
+        return ex?{station:i+1,group_size:groups[i],...exercisePayload(ex)}:{station:i+1,group_size:groups[i],title:fallback[i]||objective,exercise_id:null,category:'Generato AI',objective,space:null,equipment:null,description:'Esercizio generato automaticamente per la stazione in base a obiettivo, numero di bambini e istruttori.',variants:null,source:'ai',ai_generated:true};
       });
       blocks.push({order:blocks.length+1,title:'Circuito a stazioni',duration_minutes:stationDuration,source:'stations',rotation_minutes:rotation,groups,stations});used+=stationDuration;
     }else{
@@ -60,8 +60,8 @@
     }
 
     let remaining=total-used;
-    if(remaining>10){const theme=Math.max(10,remaining-10);blocks.push({order:blocks.length+1,title:`Gioco a tema · ${objective}`,duration_minutes:theme,source:'fallback'});used+=theme;}
-    if(used<total)blocks.push({order:blocks.length+1,title:'Partita finale / gioco libero',duration_minutes:total-used,source:'fallback'});
+    if(remaining>10){const theme=Math.max(10,remaining-10);blocks.push({order:blocks.length+1,title:`Gioco a tema · ${objective}`,duration_minutes:theme,source:'ai',ai_generated:true,category:'Gioco a tema',objective,description:'Gioco a tema generato automaticamente in funzione dell’obiettivo della seduta.'});used+=theme;}
+    if(used<total)blocks.push({order:blocks.length+1,title:'Partita finale / gioco libero',duration_minutes:total-used,source:'ai',ai_generated:true,category:'Gioco situazionale',objective:'Gioco libero e applicazione',description:'Fase finale generata automaticamente per completare la durata della seduta.'});
     return blocks.map((x,i)=>({...x,order:i+1}));
   }
 
