@@ -2,6 +2,7 @@
   let client=null,user=null;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   function lib(){return Array.isArray(window.osgbExerciseLibrary)?window.osgbExerciseLibrary:[];}
+  const sourceLabel=t=>t==='image'?'📷 Immagine':t==='web'?'🌐 Web':t==='ai'?'✨ AI':'✍️ Manuale';
   window.editExerciseAdmin=function(id){
     const x=lib().find(v=>String(v.id)===String(id));if(!x)return;
     closeM();
@@ -34,7 +35,7 @@
   window.exercises=function(){
     const items=lib();
     const list=items.length?items.map(x=>{
-      const src=x.source_type==='image'?'📷 Immagine':x.source_type==='web'?'🌐 Web':'✍️ Manuale';
+      const src=sourceLabel(x.source_type);
       return `<div class="card" style="margin-top:10px"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">${esc(x.category||'Esercizio')}</span><span class="pill yellow">${src}</span>${x.diagram_svg?'<span class="pill">Schema grafico</span>':''}</div><h3>${esc(x.title)}</h3><p class="muted">${x.duration_minutes?x.duration_minutes+' min · ':''}${esc(x.objective||'')}</p>${x.description?`<p>${esc(x.description)}</p>`:''}<div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick='openExerciseDetail(${JSON.stringify(String(x.id))})'><i data-lucide="eye"></i>Apri</button><button class="btn alt" onclick='editExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="pencil"></i>Modifica</button><button class="btn alt" onclick='deleteExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="trash-2"></i>Elimina</button></div></div>`;
     }).join(''):`<p class="muted">Nessun esercizio salvato.</p>`;
     modal(`<div class="mh"><h3>ARCHIVIO ESERCIZI</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="newExercise()"><i data-lucide="plus"></i>Nuovo manuale</button><button class="btn yellow" onclick="importExerciseImage()"><i data-lucide="image-plus"></i>Importa da immagine</button><button class="btn alt" onclick="importExerciseWeb()"><i data-lucide="globe-2"></i>Importa dal web</button></div>${list}`);
