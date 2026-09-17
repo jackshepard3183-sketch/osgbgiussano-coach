@@ -82,7 +82,7 @@
         const stations=(x.stations||[]).map((s,si)=>`<div class="card" style="margin-top:8px"><b>Stazione ${s.station} · ${s.group_size} bambini</b><p style="margin:6px 0">${esc(s.title)}</p>${s.space?`<small class="muted">${esc(s.space)}</small>`:''}${sessionId?`<div style="margin-top:7px"><button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},${si})'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div>`).join('');
         return `<div class="event"><div class="date">${x.duration_minutes} min</div><div class="body"><strong>${esc(x.title)}</strong><small>${x.groups?.join('–')||''} bambini · cambio ogni ${x.rotation_minutes||'—'} min</small>${stations}${editControls(sessionId,index)}</div></div>`;
       }
-      return `<div class="event"><div class="date">${esc(x.duration_minutes||'')} min</div><div class="body"><strong>${esc(x.title||'Esercizio')}</strong><small>${x.source==='library'?'Da archivio esercizi':'Blocco standard'}${x.space?' · '+esc(x.space):''}</small>${sessionId?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">${editControls(sessionId,index)}<button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},null)'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div></div>`;
+      return `<div class="event"><div class="date">${esc(x.duration_minutes||'')} min</div><div class="body"><strong>${esc(x.title||'Esercizio')}</strong><small>${x.source==='library'?'Da archivio esercizi':x.source==='ai'?'Generato con AI':'Blocco standard'}${x.space?' · '+esc(x.space):''}</small>${sessionId?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">${editControls(sessionId,index)}<button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},null)'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div></div>`;
     }).join('');
   }
 
@@ -131,6 +131,9 @@
     const p={...window.__pendingTraining};const id=p.id;delete p.id;let error=null;
     if(id)({error}=await client.from('training_sessions').update({...p,updated_at:new Date().toISOString()}).eq('id',id)); else ({error}=await client.from('training_sessions').insert({...p,owner_user_id:user.id}));
     if(error){console.error('training save',error);alert('Impossibile salvare la seduta.');if(btn){btn.disabled=false;btn.textContent=id?'Aggiorna seduta':'Salva seduta';}return;}
+    if(typeof window.osgbArchiveAiExercises==='function'){
+      try{await window.osgbArchiveAiExercises(p.structure||[]);}catch(e){console.warn('AI exercise archive',e);}
+    }
     window.__pendingTraining=null;closeM();await loadSessions();go('train');
   };
 
