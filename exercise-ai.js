@@ -1,7 +1,29 @@
 (function(){
-  let draft=null,lastPrompt='';
+  let draft=null,lastPrompt='',draftImageFile=null,draftImageUrl=null;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const val=id=>document.getElementById(id)?.value?.trim?.()||'';
+  const safe=s=>String(s||'image').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'image';
+
+  function clearDraftImage(){
+    if(draftImageUrl){try{URL.revokeObjectURL(draftImageUrl)}catch(_){}}
+    draftImageFile=null;draftImageUrl=null;
+  }
+
+  window.previewAiExerciseImage=function(input){
+    const file=input?.files?.[0];if(!file)return;
+    if(file.size>5*1024*1024){alert('L’immagine supera 5 MB.');input.value='';return;}
+    if(!/^image\/(jpeg|png|webp)$/i.test(file.type)){alert('Usa un’immagine JPG, PNG o WEBP.');input.value='';return;}
+    clearDraftImage();draftImageFile=file;draftImageUrl=URL.createObjectURL(file);
+    const box=document.getElementById('aiImagePreview');
+    if(box)box.innerHTML=`<img src="${draftImageUrl}" alt="Anteprima schema esercizio" style="display:block;width:100%;max-height:360px;object-fit:contain;border-radius:12px;margin:8px 0"><button class="btn alt" type="button" onclick="removeAiExerciseImage()"><i data-lucide="trash-2"></i>Rimuovi immagine</button>`;
+    if(window.lucide)lucide.createIcons();
+  };
+
+  window.removeAiExerciseImage=function(){
+    clearDraftImage();
+    const input=document.getElementById('aiExerciseImage');if(input)input.value='';
+    const box=document.getElementById('aiImagePreview');if(box)box.innerHTML='<p class="muted">Nessuna immagine selezionata.</p>';
+  };
 
   function formData(){
     return {
@@ -18,6 +40,7 @@
   }
 
   window.openAiExerciseGenerator=function(){
+    clearDraftImage();
     const players=(typeof P!=='undefined'&&Array.isArray(P))?P.length:17;
     closeM();
     modal(`<div class="mh"><h3>GENERA ESERCIZIO</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
@@ -179,12 +202,24 @@ VARIANTI: ...`;
       <div class="field"><label>Materiale</label><input id="aiDEquipment" value="${esc(draft.equipment||'')}"></div>
       <div class="field"><label>Descrizione</label><textarea id="aiDDescription" style="min-height:170px">${esc(draft.description||'')}</textarea></div>
       <div class="field"><label>Varianti</label><textarea id="aiDVariants" style="min-height:110px">${esc(draft.variants||'')}</textarea></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openAiExerciseGenerator()"><i data-lucide="arrow-left"></i>Indietro</button><button class="btn" id="aiSaveBtn" onclick="saveAiExercise()"><i data-lucide="save"></i>Salva nell'archivio</button></div>`);
+      <div class="section">IMMAGINE / SCHEMA</div>
+      <div class="card">
+        <p class="muted">Puoi caricare una grafica generata con ChatGPT o qualsiasi schema dell’esercizio. Formati: JPG, PNG, WEBP · max 5 MB.</p>
+        <div class="field"><label>Carica immagine</label><input id="aiExerciseImage" type="file" accept="image/jpeg,image/png,image/webp" onchange="previewAiExerciseImage(this)"></div>
+        <div id="aiImagePreview"><p class="muted">Nessuna immagine selezionata.</p></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn alt" onclick="openAiExerciseGenerator()"><i data-lucide="arrow-left"></i>Indietro</button><button class="btn" id="aiSaveBtn" onclick="saveAiExercise()"><i data-lucide="save"></i>Salva nell'archivio</button></div>`);
   };
 
   window.saveAiExercise=async function(){
     const client=window.osgbGetExerciseClient?.(),user=window.osgbGetExerciseUser?.();
     if(!client||!user)return;
+    let imagePath=null;
+    if(draftImageFile){
+      imagePath=`${user.id}/ai-${Date.now()}-${safe(draftImageFile.name)}`;
+      const up=await client.storage.from('exercise-images').upload(imagePath,draftImageFile,{cacheControl:'3600',upsert:false});
+      if(up.error){console.error(up.error);alert('Impossibile caricare l’immagine.');return;}
+    }
     const row={
       owner_user_id:user.id,
       title:val('aiDTitle'),
@@ -196,13 +231,18 @@ VARIANTI: ...`;
       description:val('aiDDescription')||null,
       variants:val('aiDVariants')||null,
       source_type:draft?.source_type==='ai'?'ai':'local',
+      source_image_path:imagePath,
+      source_image_name:draftImageFile?.name||null,
       imported_at:new Date().toISOString()
     };
     if(!row.title){alert('Inserisci il titolo.');return;}
     const btn=document.getElementById('aiSaveBtn');if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
     const {error}=await client.from('exercises').insert(row);
-    if(error){console.error(error);alert('Impossibile salvare l’esercizio.');if(btn){btn.disabled=false;btn.textContent="Salva nell'archivio";}return;}
+    if(error){
+      if(imagePath)await client.storage.from('exercise-images').remove([imagePath]);
+      console.error(error);alert('Impossibile salvare l’esercizio.');if(btn){btn.disabled=false;btn.textContent="Salva nell'archivio";}return;
+    }
     if(typeof window.osgbReloadExercises==='function')await window.osgbReloadExercises();
-    window.__exerciseFilter=row.source_type==='ai'?'ai':'local';draft=null;closeM();exercises(window.__exerciseFilter);
+    window.__exerciseFilter=row.source_type==='ai'?'ai':'local';draft=null;clearDraftImage();closeM();exercises(window.__exerciseFilter);
   };
 })();
