@@ -47,9 +47,17 @@
       openAiExerciseDraft(draft);
     }catch(err){
       console.error('AI exercise',err);
-      const msg=String(err?.message||'');
+      let msg=String(err?.message||'');
+      try{
+        const ctx=err?.context;
+        if(ctx&&typeof ctx.json==='function'){
+          const detail=await ctx.json();
+          if(detail?.error)msg=String(detail.error);
+        }
+      }catch(_){}
       if(status)status.textContent='';
-      alert(msg.includes('OPENAI_API_KEY')?'La generazione AI deve ancora essere attivata nel backend con la chiave API.':'Impossibile generare l’esercizio con AI. Riprova.');
+      if(msg.includes('OPENAI_API_KEY')) alert('Generazione AI non ancora attiva: manca la OPENAI_API_KEY nel backend Supabase.');
+      else alert(msg?('Generazione AI: '+msg):'Impossibile generare l’esercizio con AI. Riprova.');
     }finally{
       if(btn){btn.disabled=false;btn.innerHTML='<i data-lucide="sparkles"></i> Genera esercizio';if(window.lucide)lucide.createIcons();}
     }
