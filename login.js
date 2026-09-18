@@ -1,6 +1,7 @@
 (function(){
   const PROJECT_URL='https://rlqevucevvoldmcrcsfq.supabase.co';
   const CONFIG_KEY='osgbCoachSupabasePublishableKey';
+  const DEFAULT_PUBLISHABLE_KEY='sb_publishable_HUzURsQoble48iYrCg2h9g_ovrITinZ';
   const body=document.body;
   let client=null;
 
@@ -11,7 +12,7 @@
   function setError(msg){const el=document.getElementById('loginError');if(!el)return;el.textContent=msg;el.style.display='block'}
 
   function createClient(){
-    const key=localStorage.getItem(CONFIG_KEY)||'';
+    const key=localStorage.getItem(CONFIG_KEY)||DEFAULT_PUBLISHABLE_KEY;
     if(!key||!window.supabase?.createClient)return null;
     try{
       client=window.supabase.createClient(PROJECT_URL,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
