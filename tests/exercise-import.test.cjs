@@ -58,6 +58,19 @@ test('PDF exercise splitter recognizes two titled exercises in the same document
   assert.equal(chunks.length,2);assert.equal(ctx.osgbExerciseImport.parseText(chunks[0]).title,'Slalom');assert.equal(ctx.osgbExerciseImport.parseText(chunks[1]).title,'Duello');
 });
 
+test('ChatGPT markdown conversation splits and saves multiple exercises',async()=>{
+  const {ctx,state,document,value}=await app();
+  ctx.importExerciseChatgpt();
+  value('chatgptSourceUrl','https://chatgpt.com/share/example-123');
+  value('chatgptSourceText','**Esercizio 1 – Guida della palla**\nDurata: 10 minuti\nDescrizione: Slalom.\n\n### Esercizio 2: Duello\nDurata: 12 minuti\nDescrizione: Uno contro uno.');
+  ctx.prepareChatgptExerciseDrafts();
+  assert.match(document.body.innerHTML,/1 di 2/);
+  await ctx.saveImportedExercise();await ctx.saveImportedExercise();
+  assert.equal(state.rows.length,2);
+  assert.equal(state.rows[0].source_type,'web');
+  assert.equal(state.rows[0].source_url,'https://chatgpt.com/share/example-123');
+});
+
 test('readable Instagram link creates and saves a draft without an image',async()=>{
   const {ctx,state,document,value}=await app();
   ctx.fetch=async()=>({ok:true,text:async()=>'<html><head><meta property="og:description" content="12 likes, coach on September 20: &quot;Le porte&#10;Obiettivo: Conduzione&#10;Materiale: Cinesini&#10;Note: Due turni&quot;"></head></html>'});

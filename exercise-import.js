@@ -65,7 +65,7 @@
   function openPdfDraft(index){
     pdfDraftIndex=index;const item=pdfDrafts[index];if(!item)return;
     currentOcr=item.transcript;diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
-    const total=pdfDrafts.length,notice=total>1?`Riconosciuti ${total} esercizi nel PDF. Stai controllando l’esercizio ${index+1} di ${total}.`:item.notice||'';
+    const total=pdfDrafts.length,sourceName=importSource==='web'?'conversazione':'PDF',notice=total>1?`Riconosciuti ${total} esercizi nella ${sourceName}. Stai controllando l’esercizio ${index+1} di ${total}.`:item.notice||'';
     openExerciseImportDraft({...item.draft,transcript:item.transcript,notice});
   }
   window.preparePdfDraftManually=function(){if(checkPdfSource()){operation++;pdfDrafts=[{draft:parseText(currentOcr),transcript:currentOcr}];openPdfDraft(0);}};
@@ -96,6 +96,14 @@
       <p class="muted">Scegli come importare l’esercizio. Potrai controllare e modificare la bozza prima di salvarla nell’archivio.</p>
       <div class="grid g2"><button class="btn alt" onclick="importInstagramLink()"><i data-lucide="link"></i>Incolla link</button><button class="btn yellow" onclick="importInstagramScreenshots()"><i data-lucide="image-plus"></i>Carica screenshot</button></div>
       <p class="muted">Se Instagram non consente di leggere il link, usa gli screenshot oppure incolla la descrizione del post.</p>`);
+  };
+  window.importExerciseChatgpt=function(){
+    resetImport('web');closeM();
+    modal(`<div class="mh"><h3>IMPORTA DA CHATGPT</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div><p class="muted">Copia dalla conversazione la parte che contiene gli esercizi e incollala qui. L’app riconoscerà anche più esercizi nello stesso testo e te li farà controllare uno alla volta.</p><div class="field"><label for="chatgptSourceUrl">Link condiviso ChatGPT (facoltativo)</label><input id="chatgptSourceUrl" type="url" placeholder="https://chatgpt.com/share/..."><small class="muted">Il link viene conservato come fonte. Il testo va incollato sotto perché i link condivisi possono bloccare la lettura automatica.</small></div><div class="field"><label for="chatgptSourceText">Testo della conversazione</label><textarea id="chatgptSourceText" style="min-height:240px" placeholder="Incolla qui gli esercizi creati nella chat"></textarea></div><button class="btn" onclick="prepareChatgptExerciseDrafts()"><i data-lucide="sparkles"></i>Analizza e crea le bozze</button>`);
+  };
+  window.prepareChatgptExerciseDrafts=function(){
+    const text=textVal('chatgptSourceText'),url=textVal('chatgptSourceUrl');if(!text){alert('Incolla il testo della conversazione.');return;}if(url&&!/^https:\/\/(?:www\.)?chatgpt\.com\/share\/[A-Za-z0-9_-]+(?:[/?#].*)?$/i.test(url)){alert('Inserisci un link condiviso ChatGPT valido oppure lascia il campo vuoto.');return;}
+    operation++;sourceUrl=url;currentOcr=text;const chunks=window.osgbExerciseImport.splitExercises(text);pdfDrafts=(chunks.length?chunks:[text]).map(chunk=>({draft:parseText(chunk),transcript:chunk}));openPdfDraft(0);
   };
   window.importInstagramScreenshots=function(){
     const link=textVal('instagramSourceUrl');
@@ -199,7 +207,7 @@
       ${currentFiles.length?importSource==='pdf'?`<div class="card"><b>PDF originale</b><p class="muted">${esc(currentFile.name)}</p></div><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva il PDF originale</label>`:`<details class="card"><summary>Immagini originali (${currentFiles.length})</summary>${currentFiles.map(file=>`<img src="${previewUrl(file)}" alt="${esc(file.name)}" style="display:block;width:100%;max-height:300px;object-fit:contain;margin-top:8px">`).join('')}</details><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva ${currentFiles.length>1?'le immagini originali':'l’immagine originale'}</label>`:''}
       <label class="import-option"><input type="checkbox" id="impSaveText" ${d.saveText===false?'':'checked'}>Salva il testo trascritto</label>
       <details class="card" style="margin-bottom:12px"><summary>Controlla testo trascritto</summary><div class="field"><label for="impTranscript">Testo trascritto (modificabile)</label><textarea id="impTranscript" style="min-height:160px">${esc(d.transcript??currentOcr)}</textarea></div></details>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openDiagramEditor()"><i data-lucide="goal"></i>Ricrea schema grafico</button><button class="btn" id="saveImportedExerciseBtn" onclick="saveImportedExercise()"><i data-lucide="save"></i>${importSource==='pdf'&&pdfDraftIndex<pdfDrafts.length-1?'Salva e continua':'Salva esercizio'}</button></div>`);
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openDiagramEditor()"><i data-lucide="goal"></i>Ricrea schema grafico</button><button class="btn" id="saveImportedExerciseBtn" onclick="saveImportedExercise()"><i data-lucide="save"></i>${pdfDraftIndex<pdfDrafts.length-1?'Salva e continua':'Salva esercizio'}</button></div>`);
   };
   function draftSnapshot(){return {title:textVal('impTitle'),category:textVal('impCategory'),duration:textVal('impDuration'),objective:textVal('impObjective'),space:textVal('impSpace'),equipment:textVal('impEquipment'),description:textVal('impDescription'),variants:textVal('impVariants'),notes:textVal('impNotes'),transcript:textVal('impTranscript'),saveImages:checked('impSaveImages'),saveText:checked('impSaveText')};}
   function renderDiagram(){
@@ -262,7 +270,7 @@
       inserted=true;
       if(typeof window.osgbReloadExercises==='function')await window.osgbReloadExercises();
       if(version===operation&&btn?.isConnected){
-        if(importSource==='pdf'&&pdfDraftIndex<pdfDrafts.length-1){pdfDraftIndex++;openPdfDraft(pdfDraftIndex);}
+        if(pdfDraftIndex<pdfDrafts.length-1){pdfDraftIndex++;openPdfDraft(pdfDraftIndex);}
         else{resetImport('image');window.__exerciseFilter=row.source_type;closeM();exercises(row.source_type);}
       }
     }catch(err){

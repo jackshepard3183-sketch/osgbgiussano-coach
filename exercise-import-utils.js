@@ -43,7 +43,7 @@
     const source=String(text||'').trim();if(!source)return [];
     const byTitle=source.split(/(?=^\s*Titolo\s*[:–-])/gim).map(x=>x.trim()).filter(Boolean);
     if(byTitle.length>1)return byTitle;
-    const byNumber=source.split(/(?=^\s*(?:Esercizio|Esercitazione)\s*(?:n\.?\s*)?\d+\s*[:–-]?)/gim).map(x=>x.trim()).filter(Boolean);
+    const byNumber=source.split(/(?=^\s*(?:#{1,6}\s*)?(?:\*{1,2})?(?:Esercizio|Esercitazione)\s*(?:n\.?\s*)?\d+\s*[:–-]?)/gim).map(x=>x.replace(/^\s*(?:#{1,6}\s*)?\*{1,2}/,'').replace(/\*{1,2}\s*$/m,'').trim()).filter(Boolean);
     if(byNumber.length>1)return byNumber;
     const pages=pageTexts.map(x=>String(x||'').trim()).filter(Boolean);
     const exercisePages=pages.filter(x=>/(?:titolo|esercizio|esercitazione|obiettiv[oi]|descrizione|svolgimento|materiale)\s*[:–-]?/i.test(x)&&x.length>=30);
