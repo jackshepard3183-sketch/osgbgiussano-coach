@@ -2,6 +2,8 @@
   let client=null,user=null,items=[];
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
+  const sourceLabel=value=>window.osgbExerciseImport.sourceLabel(value);
+
   function expose(){
     window.osgbExerciseLibrary=items.map(x=>({...x}));
     window.dispatchEvent(new CustomEvent('osgb-exercises-updated',{detail:{count:items.length}}));
@@ -9,7 +11,7 @@
 
   async function loadExercises(){
     if(!client)return;
-    const {data,error}=await client.from('exercises').select('id,title,category,duration_minutes,objective,space,equipment,description,variants,source_type,source_url,diagram,diagram_svg,source_image_path,source_image_name,source_ocr_text,imported_at,created_at').order('created_at',{ascending:false});
+    const {data,error}=await client.from('exercises').select('id,title,category,duration_minutes,objective,space,equipment,description,variants,notes,source_images,source_type,source_url,diagram,diagram_svg,source_image_path,source_image_name,source_ocr_text,imported_at,created_at').order('created_at',{ascending:false});
     if(error){console.error('exercise load',error);return;}
     items=data||[];
     expose();

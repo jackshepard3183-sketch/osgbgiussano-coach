@@ -156,3 +156,7 @@ th,td{padding:6px 7px;vertical-align:top}
   .g3 .kpi{font-size:18px}
   .player .sbtn{width:29px;height:29px}
 }
+
+/* Exercise import options retain comfortable checkbox sizing on phones. */
+.import-option{display:flex;align-items:center;gap:10px;margin:14px 0;line-height:1.4}
+.import-option input[type="checkbox"]{width:20px;height:20px;flex:0 0 20px;margin:0}

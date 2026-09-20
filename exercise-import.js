@@ -1,77 +1,152 @@
 (function(){
-  let client=null,user=null,currentFile=null,currentOcr='',diagramItems=[],arrowStart=null;
+  let client=null,user=null,currentFile=null,currentFiles=[],currentOcr='',diagramItems=[],arrowStart=null;
+  let importSource='image',sourceUrl='',previewUrls=[],ocrLoading=null,operation=0,saving=false;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const safe=s=>String(s||'file').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'file';
   const textVal=id=>document.getElementById(id)?.value.trim()||'';
-  const parseText=text=>{
-    const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    const joined=lines.join(' ');
-    const duration=(joined.match(/(?:durata|tempo)\s*[:\-]?\s*(\d{1,3})\s*(?:min|')/i)||[])[1]||'';
-    const space=(joined.match(/(?:spazio|campo)\s*[:\-]?\s*([^.;\n]{3,40})/i)||[])[1]||'';
-    const equipment=(joined.match(/(?:materiale|attrezzatura)\s*[:\-]?\s*([^.;\n]{3,90})/i)||[])[1]||'';
-    const objective=(joined.match(/(?:obiettivo|finalit[aà])\s*[:\-]?\s*([^.;\n]{3,90})/i)||[])[1]||'';
-    let category='';
-    const low=joined.toLowerCase();
-    if(low.includes('1 contro 1')||low.includes('1vs1'))category='1 contro 1';
-    else if(low.includes('conduzione'))category='Conduzione';
-    else if(low.includes('passaggio'))category='Passaggio e ricezione';
-    else if(low.includes('coordinaz'))category='Coordinazione';
-    else if(low.includes('finalizz'))category='Finalizzazione';
-    else if(low.includes('possesso'))category='Gioco e collaborazione';
-    return {title:lines[0]?.slice(0,110)||'Esercizio importato',category,duration,objective,space,equipment,description:lines.slice(1).join('\n').slice(0,5000)};
-  };
+  const checked=id=>document.getElementById(id)?.checked!==false;
+  const parseText=text=>window.osgbExerciseImport.parseText(text);
+  const MAX_FILES=5;
 
+  function clearPreviews(){previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls=[];}
+  function previewUrl(file){const url=URL.createObjectURL(file);previewUrls.push(url);return url;}
+  function resetImport(source){
+    operation++;clearPreviews();currentFile=null;currentFiles=[];currentOcr='';sourceUrl='';importSource=source;
+    diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
+  }
   function ensureTesseract(){
     if(window.Tesseract)return Promise.resolve();
-    return new Promise((resolve,reject)=>{
-      const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.async=true;s.onload=resolve;s.onerror=()=>reject(new Error('OCR non disponibile'));document.head.appendChild(s);
+    if(ocrLoading)return ocrLoading;
+    ocrLoading=new Promise((resolve,reject)=>{
+      const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.async=true;
+      s.onload=resolve;s.onerror=()=>{s.remove();ocrLoading=null;reject(new Error('OCR non disponibile'));};document.head.appendChild(s);
     });
+    return ocrLoading;
   }
-
-  window.importExerciseImage=function(){
-    closeM();currentFile=null;currentOcr='';diagramItems=[];arrowStart=null;
-    modal(`<div class="mh"><h3>IMPORTA DA IMMAGINE</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
-      <p class="muted">Carica una foto o uno screenshot. Il testo viene trascritto nel browser e potrai correggerlo prima del salvataggio.</p>
-      <div class="field"><label>Immagine</label><input id="imgExerciseFile" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onchange="previewExerciseImage(this)"></div>
+  function showImageImport(){
+    closeM();clearPreviews();
+    const instagram=importSource==='instagram';
+    modal(`<div class="mh"><h3>${instagram?'SCREENSHOT INSTAGRAM':'IMPORTA DA IMMAGINE'}</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
+      <p class="muted">${instagram?'Carica gli screenshot del post, del reel e della descrizione.':'Carica una foto o uno screenshot.'} Il testo viene trascritto nel browser e potrai correggerlo prima di salvare. Uno schema senza testo richiede una descrizione manuale.</p>
+      ${instagram?'<p><span class="pill yellow">📱 Instagram</span></p><div class="field"><label for="instagramImageUrl">Link del post/reel (facoltativo)</label><input id="instagramImageUrl" type="url" placeholder="https://www.instagram.com/reel/.../" value="'+esc(sourceUrl)+'"></div>':''}
+      <div class="field"><label for="imgExerciseFile">${instagram?'Screenshot (fino a 5)':'Immagine'}</label><input id="imgExerciseFile" type="file" accept="image/jpeg,image/png,image/webp" ${instagram?'multiple':''} onchange="previewExerciseImage(this)"><small class="muted">JPG, PNG o WEBP · massimo 5 MB per immagine.</small></div>
       <div id="imgExercisePreview"></div>
-      <button class="btn yellow" id="ocrExerciseBtn" onclick="runExerciseOcr()"><i data-lucide="scan-text"></i>Trascrivi immagine</button>
-      <div id="ocrExerciseStatus" class="muted" style="margin-top:10px"></div>`);
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn yellow" id="ocrExerciseBtn" onclick="runExerciseOcr()"><i data-lucide="scan-text"></i>Trascrivi ${instagram?'screenshot':'immagine'}</button><button class="btn alt" id="manualImageDraftBtn" onclick="prepareImageDraftManually()">Compila bozza manualmente</button></div>
+      <div id="ocrExerciseStatus" role="status" aria-live="polite" class="muted" style="margin-top:10px"></div>`);
+  }
+  window.importExerciseImage=function(){resetImport('image');showImageImport();};
+  window.importExerciseInstagram=function(){
+    resetImport('instagram');closeM();
+    modal(`<div class="mh"><h3>IMPORTA DA INSTAGRAM</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
+      <p class="muted">Scegli come importare l’esercizio. Potrai controllare e modificare la bozza prima di salvarla nell’archivio.</p>
+      <div class="grid g2"><button class="btn alt" onclick="importInstagramLink()"><i data-lucide="link"></i>Incolla link</button><button class="btn yellow" onclick="importInstagramScreenshots()"><i data-lucide="image-plus"></i>Carica screenshot</button></div>
+      <p class="muted">Se Instagram non consente di leggere il link, usa gli screenshot oppure incolla la descrizione del post.</p>`);
   };
-
-  window.previewExerciseImage=function(input){
-    const file=input?.files?.[0];if(!file)return;currentFile=file;
-    if(file.size>5*1024*1024){alert('L’immagine supera 5 MB.');input.value='';currentFile=null;return;}
-    const url=URL.createObjectURL(file);const box=document.getElementById('imgExercisePreview');if(box)box.innerHTML=`<img src="${url}" alt="Anteprima" style="display:block;width:100%;max-height:360px;object-fit:contain;border-radius:12px;margin:8px 0 12px">`;
+  window.importInstagramScreenshots=function(){
+    const link=textVal('instagramSourceUrl');
+    if(link){try{sourceUrl=window.osgbExerciseImport.instagramUrl(link);}catch(_){sourceUrl='';}}
+    operation++;importSource='instagram';showImageImport();
   };
-
-  window.runExerciseOcr=async function(){
-    if(!currentFile){alert('Seleziona prima un’immagine.');return;}
-    const btn=document.getElementById('ocrExerciseBtn'),status=document.getElementById('ocrExerciseStatus');
-    try{
-      if(btn)btn.disabled=true;if(status)status.textContent='Preparazione OCR…';
-      await ensureTesseract();
-      const result=await window.Tesseract.recognize(currentFile,'ita',{logger:m=>{if(status&&m.status==='recognizing text')status.textContent=`Trascrizione ${Math.round((m.progress||0)*100)}%`;}});
-      currentOcr=result?.data?.text||'';
-      const draft=parseText(currentOcr);openExerciseImportDraft(draft);
-    }catch(err){console.error(err);alert('Non sono riuscito a trascrivere automaticamente questa immagine. Puoi comunque inserire il testo manualmente.');openExerciseImportDraft({title:'Esercizio importato',description:''});}
-    finally{if(btn)btn.disabled=false;}
-  };
-
-  window.openExerciseImportDraft=function(d={}){
+  window.importInstagramLink=function(){
     closeM();
+    modal(`<div class="mh"><h3>INCOLLA LINK INSTAGRAM</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
+      <div class="field"><label for="instagramSourceUrl">Incolla link del post/reel</label><input id="instagramSourceUrl" type="url" placeholder="https://www.instagram.com/reel/.../" value="${esc(sourceUrl)}"></div>
+      <button class="btn yellow" id="instagramReadBtn" onclick="readInstagramLink()"><i data-lucide="download"></i>Leggi link e crea bozza</button>
+      <div id="instagramImportStatus" role="status" aria-live="polite" class="muted" style="margin-top:10px"></div>
+      <div class="field"><label for="instagramSourceText">Descrizione del post (se il link non è leggibile)</label><textarea id="instagramSourceText" style="min-height:160px" placeholder="Incolla qui il testo dell’esercizio"></textarea></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="prepareInstagramTextDraft()">Crea bozza dal testo</button><button class="btn alt" onclick="importInstagramScreenshots()"><i data-lucide="image-plus"></i>Carica screenshot</button></div>`);
+  };
+  function linkValue(id,optional=false){const value=textVal(id);return optional&&!value?'':window.osgbExerciseImport.instagramUrl(value);}
+  function instagramCaption(html){
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const metadata=doc.querySelector('meta[property="og:description"]')?.content||doc.querySelector('meta[name="description"]')?.content||'';
+    // Instagram commonly wraps captions in quotes after the author/date/like count.
+    const quote=metadata.match(/:\s*["“]([\s\S]+)["”]\s*\.?$/);
+    const caption=quote?quote[1]:metadata;
+    if(!caption.trim()||/^(instagram|login\s*[•|–-]\s*instagram)$/i.test(caption.trim())||/^(?:log in|sign up|join instagram|create an account|accedi|iscriviti|crea un account|entra in instagram)\b/i.test(caption)||(!quote&&/see (?:instagram )?(?:photos|videos)|see what .+ (?:are|is) sharing|check out .+ on instagram|guarda (?:le foto|i video)|scopri .+ su instagram/i.test(caption))){throw new Error('Nessuna descrizione leggibile');}
+    return caption.trim().slice(0,12000);
+  }
+  window.readInstagramLink=async function(){
+    const status=document.getElementById('instagramImportStatus'),btn=document.getElementById('instagramReadBtn');
+    let url;try{url=linkValue('instagramSourceUrl');}catch(e){if(status)status.textContent=e.message;return;}
+    const version=++operation,controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),12000);
+    if(btn)btn.disabled=true;if(status)status.textContent='Lettura del post Instagram…';
+    try{
+      const response=await fetch(url,{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'});
+      if(!response.ok)throw new Error('Contenuto non disponibile');
+      const caption=instagramCaption(await response.text());
+      if(version!==operation||!btn?.isConnected)return;
+      // Keep the source tied to the content actually fetched, even if the input was edited meanwhile.
+      sourceUrl=url;currentOcr=caption;openExerciseImportDraft(parseText(caption));
+    }catch(_){if(version===operation&&status?.isConnected)status.textContent='Instagram non consente di leggere questo contenuto. Carica gli screenshot oppure incolla la descrizione qui sotto per creare la bozza.';}
+    finally{clearTimeout(timeout);if(btn)btn.disabled=false;}
+  };
+  window.prepareInstagramTextDraft=function(){
+    try{sourceUrl=linkValue('instagramSourceUrl');}catch(e){alert(e.message);return;}
+    const text=textVal('instagramSourceText');if(!text){alert('Incolla la descrizione del post oppure carica uno screenshot.');return;}
+    operation++;currentOcr=text;openExerciseImportDraft(parseText(text));
+  };
+  window.previewExerciseImage=function(input){
+    const files=Array.from(input?.files||[]);if(!files.length)return;
+    operation++;clearPreviews();currentFile=null;currentFiles=[];currentOcr='';
+    const box=document.getElementById('imgExercisePreview');if(box)box.innerHTML='';
+    if(files.length>(importSource==='instagram'?MAX_FILES:1)){alert('Puoi caricare al massimo '+MAX_FILES+' screenshot.');input.value='';return;}
+    if(files.some(file=>!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5*1024*1024)){
+      alert('Usa immagini JPG, PNG o WEBP, ciascuna entro 5 MB.');input.value='';return;
+    }
+    currentFiles=files;currentFile=files[0];
+    if(box)box.innerHTML=files.map((file,i)=>`<figure style="margin:8px 0 12px"><img src="${previewUrl(file)}" alt="Anteprima ${i+1}" style="display:block;width:100%;max-height:300px;object-fit:contain;border-radius:12px"><figcaption class="muted">${i+1}. ${esc(file.name)}</figcaption></figure>`).join('');
+  };
+  function checkImageSource(){
+    if(!currentFiles.length){alert('Seleziona prima un’immagine.');return false;}
+    if(importSource==='instagram'){try{sourceUrl=linkValue('instagramImageUrl',true);}catch(e){alert(e.message);return false;}}
+    return true;
+  }
+  window.prepareImageDraftManually=function(){if(checkImageSource()){operation++;openExerciseImportDraft(parseText(currentOcr));}};
+  window.runExerciseOcr=async function(){
+    if(!checkImageSource())return;
+    const btn=document.getElementById('ocrExerciseBtn'),status=document.getElementById('ocrExerciseStatus');
+    const input=document.getElementById('imgExerciseFile'),manual=document.getElementById('manualImageDraftBtn');
+    const version=++operation,files=[...currentFiles],texts=[];
+    try{
+      if(btn)btn.disabled=true;if(input)input.disabled=true;if(manual)manual.disabled=true;
+      if(status)status.textContent='Preparazione OCR…';
+      await ensureTesseract();
+      for(let i=0;i<files.length;i++){
+        if(version!==operation||!btn?.isConnected)return;
+        const result=await window.Tesseract.recognize(files[i],'ita',{logger:m=>{if(status?.isConnected&&m.status==='recognizing text')status.textContent=`Screenshot ${i+1}/${files.length} · Trascrizione ${Math.round((m.progress||0)*100)}%`;}});
+        texts.push(result?.data?.text?.trim()||'');
+      }
+      if(version!==operation||!btn?.isConnected)return;
+      currentOcr=texts.filter(Boolean).join('\n\n');
+      openExerciseImportDraft({...parseText(currentOcr),notice:currentOcr?'':'Nessun testo riconosciuto. Compila la descrizione usando le immagini come riferimento.'});
+    }catch(err){
+      if(version!==operation||!btn?.isConnected)return;
+      console.error(err);currentOcr=texts.filter(Boolean).join('\n\n');
+      openExerciseImportDraft({...parseText(currentOcr),notice:'Trascrizione non completata. Controlla il testo disponibile e integra manualmente la bozza.'});
+    }finally{if(btn)btn.disabled=false;if(input)input.disabled=false;if(manual)manual.disabled=false;}
+  };
+  window.openExerciseImportDraft=function(d={}){
+    closeM();clearPreviews();
     modal(`<div class="mh"><h3>BOZZA ESERCIZIO</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
-      <p class="muted">Controlla e correggi i dati riconosciuti prima di salvare.</p>
-      <div class="field"><label>Titolo</label><input id="impTitle" value="${esc(d.title||'')}"></div>
-      <div class="grid g2"><div class="field"><label>Categoria</label><input id="impCategory" value="${esc(d.category||'')}"></div><div class="field"><label>Durata (min)</label><input id="impDuration" type="number" min="1" value="${esc(d.duration||10)}"></div></div>
-      <div class="field"><label>Obiettivo</label><input id="impObjective" value="${esc(d.objective||'')}"></div>
-      <div class="field"><label>Spazio</label><input id="impSpace" value="${esc(d.space||'')}"></div>
-      <div class="field"><label>Materiale</label><input id="impEquipment" value="${esc(d.equipment||'')}"></div>
-      <div class="field"><label>Descrizione</label><textarea id="impDescription" style="min-height:150px">${esc(d.description||'')}</textarea></div>
-      <div class="field"><label>Varianti</label><textarea id="impVariants"></textarea></div>
+      <p><span class="pill yellow">${window.osgbExerciseImport.sourceLabel(importSource)}</span></p>
+      <p class="muted">Controlla e correggi i dati riconosciuti prima di salvare.${d.notice?' '+esc(d.notice):''}</p>
+      ${sourceUrl?`<p class="muted exercise-source-url">${esc(sourceUrl)}</p>`:''}
+      <div class="field"><label for="impTitle">Titolo</label><input id="impTitle" value="${esc(d.title||'')}"></div>
+      <div class="grid g2"><div class="field"><label for="impCategory">Categoria</label><input id="impCategory" value="${esc(d.category||'')}"></div><div class="field"><label for="impDuration">Durata (min)</label><input id="impDuration" type="number" min="1" value="${esc(d.duration||'')}"></div></div>
+      <div class="field"><label for="impObjective">Obiettivo</label><input id="impObjective" value="${esc(d.objective||'')}"></div>
+      <div class="field"><label for="impSpace">Spazio</label><input id="impSpace" value="${esc(d.space||'')}"></div>
+      <div class="field"><label for="impEquipment">Materiale</label><input id="impEquipment" value="${esc(d.equipment||'')}"></div>
+      <div class="field"><label for="impDescription">Descrizione</label><textarea id="impDescription" style="min-height:150px">${esc(d.description||'')}</textarea></div>
+      <div class="field"><label for="impVariants">Varianti</label><textarea id="impVariants">${esc(d.variants||'')}</textarea></div>
+      <div class="field"><label for="impNotes">Note</label><textarea id="impNotes">${esc(d.notes||'')}</textarea></div>
+      ${currentFiles.length?`<details class="card"><summary>Immagini originali (${currentFiles.length})</summary>${currentFiles.map(file=>`<img src="${previewUrl(file)}" alt="${esc(file.name)}" style="display:block;width:100%;max-height:300px;object-fit:contain;margin-top:8px">`).join('')}</details><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva ${currentFiles.length>1?'le immagini originali':'l’immagine originale'}</label>`:''}
+      <label class="import-option"><input type="checkbox" id="impSaveText" ${d.saveText===false?'':'checked'}>Salva il testo trascritto</label>
+      <details class="card" style="margin-bottom:12px"><summary>Controlla testo trascritto</summary><div class="field"><label for="impTranscript">Testo trascritto (modificabile)</label><textarea id="impTranscript" style="min-height:160px">${esc(d.transcript??currentOcr)}</textarea></div></details>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openDiagramEditor()"><i data-lucide="goal"></i>Ricrea schema grafico</button><button class="btn" id="saveImportedExerciseBtn" onclick="saveImportedExercise()"><i data-lucide="save"></i>Salva esercizio</button></div>`);
   };
-
-  function draftSnapshot(){return {title:textVal('impTitle'),category:textVal('impCategory'),duration:textVal('impDuration'),objective:textVal('impObjective'),space:textVal('impSpace'),equipment:textVal('impEquipment'),description:textVal('impDescription'),variants:textVal('impVariants')};}
+  function draftSnapshot(){return {title:textVal('impTitle'),category:textVal('impCategory'),duration:textVal('impDuration'),objective:textVal('impObjective'),space:textVal('impSpace'),equipment:textVal('impEquipment'),description:textVal('impDescription'),variants:textVal('impVariants'),notes:textVal('impNotes'),transcript:textVal('impTranscript'),saveImages:checked('impSaveImages'),saveText:checked('impSaveText')};}
   function renderDiagram(){
     const svg=document.getElementById('diagramCanvas');if(!svg)return;
     const defs='<defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#17396f"/></marker></defs>';
@@ -96,7 +171,7 @@
       <p class="muted" id="diagramHint">Strumento: giocatore blu</p>
       <button class="btn" style="margin-top:10px" onclick="backToExerciseDraft()"><i data-lucide="check"></i>Usa questo schema</button>`);
     window.__diagramTool='blue';renderDiagram();
-    if(currentFile){const img=document.getElementById('diagramSourcePreview');if(img)img.src=URL.createObjectURL(currentFile);}
+    if(currentFile){const img=document.getElementById('diagramSourcePreview');if(img)img.src=previewUrl(currentFile);}
   };
 
   window.setDiagramTool=function(t){window.__diagramTool=t;arrowStart=null;const h=document.getElementById('diagramHint');if(h)h.textContent=t==='arrow'?'Freccia: tocca punto iniziale e punto finale':`Strumento: ${t}`;};
@@ -106,17 +181,40 @@
   window.backToExerciseDraft=function(){const d=window.__exerciseDraft||{};const svg=document.getElementById('diagramCanvas');window.__diagramSvg=svg?.outerHTML||window.__diagramSvg||null;openExerciseImportDraft(d);};
 
   window.saveImportedExercise=async function(){
-    if(!client||!user||!currentFile)return;
-    const title=textVal('impTitle');if(!title){alert('Inserisci il titolo.');return;}
-    const btn=document.getElementById('saveImportedExerciseBtn');if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
-    const path=`${user.id}/${Date.now()}-${safe(currentFile.name)}`;
-    const up=await client.storage.from('exercise-images').upload(path,currentFile,{cacheControl:'3600',upsert:false});
-    if(up.error){console.error(up.error);alert('Impossibile caricare l’immagine.');if(btn){btn.disabled=false;btn.textContent='Salva esercizio';}return;}
-    const row={owner_user_id:user.id,title,category:textVal('impCategory')||null,duration_minutes:parseInt(textVal('impDuration')||'0',10)||null,objective:textVal('impObjective')||null,space:textVal('impSpace')||null,equipment:textVal('impEquipment')||null,description:textVal('impDescription')||null,variants:textVal('impVariants')||null,source_type:'image',source_image_path:path,source_image_name:currentFile.name,source_ocr_text:currentOcr||null,diagram_svg:window.__diagramSvg||null,imported_at:new Date().toISOString()};
-    const ins=await client.from('exercises').insert(row);
-    if(ins.error){await client.storage.from('exercise-images').remove([path]);console.error(ins.error);alert('Impossibile salvare l’esercizio.');if(btn){btn.disabled=false;btn.textContent='Salva esercizio';}return;}
-    currentFile=null;currentOcr='';diagramItems=[];window.__diagramSvg=null;window.__exerciseDraft=null;
-    if(typeof window.osgbReloadExercises==='function')await window.osgbReloadExercises();closeM();exercises();
+    if(saving)return;
+    if(!client||!user){alert('Connessione non disponibile. Accedi nuovamente e riprova.');return;}
+    const draft=draftSnapshot();
+    if(!draft.title){alert('Inserisci il titolo.');return;}
+    const duration=draft.duration?Number(draft.duration):null;
+    if(duration!==null&&(!Number.isInteger(duration)||duration<1)){alert('Inserisci una durata intera maggiore di zero.');return;}
+    const btn=document.getElementById('saveImportedExerciseBtn'),version=operation;
+    const files=draft.saveImages?[...currentFiles]:[],uploaded=[];
+    const row={owner_user_id:user.id,title:draft.title,category:draft.category||null,duration_minutes:duration,objective:draft.objective||null,space:draft.space||null,equipment:draft.equipment||null,description:draft.description||null,variants:draft.variants||null,notes:draft.notes||null,source_type:importSource,source_url:sourceUrl||null,source_ocr_text:draft.saveText?(draft.transcript||null):null,diagram_svg:window.__diagramSvg||null,imported_at:new Date().toISOString()};
+    saving=true;if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
+    let inserted=false;
+    try{
+      const batch=crypto.randomUUID();
+      for(let i=0;i<files.length;i++){
+        const file=files[i],path=`${user.id}/${batch}-${i}-${safe(file.name)}`;
+        const up=await client.storage.from('exercise-images').upload(path,file,{cacheControl:'3600',upsert:false});
+        if(up.error)throw up.error;
+        uploaded.push({path,name:file.name});
+      }
+      row.source_images=uploaded;
+      row.source_image_path=uploaded[0]?.path||null;
+      row.source_image_name=uploaded[0]?.name||null;
+      const ins=await client.from('exercises').insert(row);if(ins.error)throw ins.error;
+      inserted=true;
+      if(typeof window.osgbReloadExercises==='function')await window.osgbReloadExercises();
+      if(version===operation&&btn?.isConnected){resetImport('image');window.__exerciseFilter=row.source_type;closeM();exercises(row.source_type);}
+    }catch(err){
+      if(!inserted&&uploaded.length){
+        try{const removed=await client.storage.from('exercise-images').remove(uploaded.map(x=>x.path));if(removed.error)console.warn('Pulizia immagini incompleta',removed.error);}catch(cleanupError){console.warn('Pulizia immagini incompleta',cleanupError);}
+      }
+      console.error(err);
+      alert(inserted?'Esercizio salvato. Riapri l’archivio per visualizzarlo.':'Impossibile salvare l’esercizio. La bozza è ancora disponibile: riprova.');
+      if(inserted&&version===operation&&btn?.isConnected){resetImport('image');closeM();}
+    }finally{saving=false;if(btn){btn.disabled=false;btn.textContent='Salva esercizio';}}
   };
 
   window.importExerciseWeb=function(){
