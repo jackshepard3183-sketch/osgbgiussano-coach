@@ -59,7 +59,8 @@
       const blocks=await Promise.all(images.map(async(image,i)=>{
         try{
           const {data}=await client.storage.from('exercise-images').createSignedUrl(image.path,3600);
-          return data?.signedUrl?`<div class="card exercise-source-card" style="margin-top:12px"><b>Immagine originale ${images.length>1?i+1:''}</b><img src="${esc(data.signedUrl)}" alt="${esc(image.name||'Fonte esercizio')}" class="exercise-source-image"></div>`:'<p class="muted">Immagine originale non disponibile.</p>';
+          const pdf=image.type==='application/pdf'||/\.pdf$/i.test(image.name||'');
+          return data?.signedUrl?(pdf?`<div class="card exercise-source-card" style="margin-top:12px"><b>📄 PDF originale</b><p class="muted">${esc(image.name||'Documento PDF')}</p><button class="btn alt" onclick='openExerciseSource(${esc(JSON.stringify(String(data.signedUrl)))})'><i data-lucide="file-text"></i>Apri PDF</button></div>`:`<div class="card exercise-source-card" style="margin-top:12px"><b>Immagine originale ${images.length>1?i+1:''}</b><img src="${esc(data.signedUrl)}" alt="${esc(image.name||'Fonte esercizio')}" class="exercise-source-image"></div>`):'<p class="muted">Allegato originale non disponibile.</p>';
         }catch(_){return '<p class="muted">Immagine originale non disponibile.</p>';}
       }));
       sourceImage=blocks.join('');

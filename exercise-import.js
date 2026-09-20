@@ -1,6 +1,6 @@
 (function(){
   let client=null,user=null,currentFile=null,currentFiles=[],currentOcr='',diagramItems=[],arrowStart=null;
-  let importSource='image',sourceUrl='',previewUrls=[],ocrLoading=null,operation=0,saving=false;
+  let importSource='image',sourceUrl='',previewUrls=[],ocrLoading=null,pdfLoading=null,pdfDrafts=[],pdfDraftIndex=0,operation=0,saving=false;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const safe=s=>String(s||'file').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'file';
   const textVal=id=>document.getElementById(id)?.value.trim()||'';
@@ -12,7 +12,7 @@
   function previewUrl(file){const url=URL.createObjectURL(file);previewUrls.push(url);return url;}
   function resetImport(source){
     operation++;clearPreviews();currentFile=null;currentFiles=[];currentOcr='';sourceUrl='';importSource=source;
-    diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
+    pdfDrafts=[];pdfDraftIndex=0;diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
   }
   function ensureTesseract(){
     if(window.Tesseract)return Promise.resolve();
@@ -22,6 +22,16 @@
       s.onload=resolve;s.onerror=()=>{s.remove();ocrLoading=null;reject(new Error('OCR non disponibile'));};document.head.appendChild(s);
     });
     return ocrLoading;
+  }
+  function ensurePdfJs(){
+    if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+    if(pdfLoading)return pdfLoading;
+    pdfLoading=new Promise((resolve,reject)=>{
+      const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';s.async=true;
+      s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';resolve(window.pdfjsLib);};
+      s.onerror=()=>{s.remove();pdfLoading=null;reject(new Error('Lettore PDF non disponibile'));};document.head.appendChild(s);
+    });
+    return pdfLoading;
   }
   function showImageImport(){
     closeM();clearPreviews();
@@ -35,6 +45,51 @@
       <div id="ocrExerciseStatus" role="status" aria-live="polite" class="muted" style="margin-top:10px"></div>`);
   }
   window.importExerciseImage=function(){resetImport('image');showImageImport();};
+  window.importExercisePdf=function(){
+    resetImport('pdf');closeM();
+    modal(`<div class="mh"><h3>IMPORTA DA PDF</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
+      <p class="muted">Carica una scheda o una raccolta di esercizi in PDF. Il testo di tutte le pagine verrà estratto nel browser e trasformato in una bozza modificabile.</p>
+      <p><span class="pill yellow">📄 PDF</span></p>
+      <div class="field"><label for="pdfExerciseFile">Documento PDF</label><input id="pdfExerciseFile" type="file" accept="application/pdf,.pdf" onchange="previewExercisePdf(this)"><small class="muted">Un PDF · massimo 30 MB. Se contiene più esercizi, verranno creati separatamente.</small></div>
+      <div id="pdfExercisePreview"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn yellow" id="readExercisePdfBtn" onclick="readExercisePdf()"><i data-lucide="scan-text"></i>Leggi PDF e crea bozza</button><button class="btn alt" id="manualPdfDraftBtn" onclick="preparePdfDraftManually()">Compila bozza manualmente</button></div>
+      <div id="pdfExerciseStatus" role="status" aria-live="polite" class="muted" style="margin-top:10px"></div>`);
+  };
+  window.previewExercisePdf=function(input){
+    const file=input?.files?.[0];operation++;clearPreviews();currentFile=null;currentFiles=[];currentOcr='';
+    const box=document.getElementById('pdfExercisePreview');if(box)box.innerHTML='';if(!file)return;
+    if(file.type!=='application/pdf'||file.size>30*1024*1024){alert('Usa un file PDF entro 30 MB.');input.value='';return;}
+    currentFile=file;currentFiles=[file];if(box)box.innerHTML=`<div class="card" style="margin:8px 0 12px"><b>${esc(file.name)}</b><p class="muted" style="margin-bottom:0">${Math.max(1,Math.round(file.size/1024))} KB</p></div>`;
+  };
+  function checkPdfSource(){if(!currentFile||currentFile.type!=='application/pdf'){alert('Seleziona prima un PDF.');return false;}return true;}
+  function openPdfDraft(index){
+    pdfDraftIndex=index;const item=pdfDrafts[index];if(!item)return;
+    currentOcr=item.transcript;diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
+    const total=pdfDrafts.length,notice=total>1?`Riconosciuti ${total} esercizi nel PDF. Stai controllando l’esercizio ${index+1} di ${total}.`:item.notice||'';
+    openExerciseImportDraft({...item.draft,transcript:item.transcript,notice});
+  }
+  window.preparePdfDraftManually=function(){if(checkPdfSource()){operation++;pdfDrafts=[{draft:parseText(currentOcr),transcript:currentOcr}];openPdfDraft(0);}};
+  window.readExercisePdf=async function(){
+    if(!checkPdfSource())return;
+    const btn=document.getElementById('readExercisePdfBtn'),input=document.getElementById('pdfExerciseFile'),manual=document.getElementById('manualPdfDraftBtn'),status=document.getElementById('pdfExerciseStatus');
+    const version=++operation,file=currentFile;
+    try{
+      if(btn)btn.disabled=true;if(input)input.disabled=true;if(manual)manual.disabled=true;if(status)status.textContent='Apertura PDF…';
+      const pdfjs=await ensurePdfJs(),bytes=await file.arrayBuffer(),pdf=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise,texts=[];
+      for(let n=1;n<=pdf.numPages;n++){
+        if(version!==operation||!btn?.isConnected)return;
+        if(status)status.textContent=`Lettura pagina ${n}/${pdf.numPages}…`;
+        const page=await pdf.getPage(n),content=await page.getTextContent();
+        const text=content.items.reduce((out,item)=>out+(item.str||'')+(item.hasEOL?'\n':' '),'').replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n').trim();if(text)texts.push(text);
+      }
+      if(version!==operation||!btn?.isConnected)return;
+      currentOcr=texts.join('\n\n');
+      const chunks=window.osgbExerciseImport.splitExercises(currentOcr,texts);
+      pdfDrafts=(chunks.length?chunks:['']).map(chunk=>({draft:parseText(chunk),transcript:chunk,notice:chunk?'':'Il PDF non contiene testo selezionabile. Compila la bozza manualmente usando il documento come riferimento.'}));
+      openPdfDraft(0);
+    }catch(err){if(version!==operation||!btn?.isConnected)return;console.error(err);if(status)status.textContent='Non è stato possibile leggere il PDF. Puoi comunque compilare la bozza manualmente.';}
+    finally{if(btn)btn.disabled=false;if(input)input.disabled=false;if(manual)manual.disabled=false;}
+  };
   window.importExerciseInstagram=function(){
     resetImport('instagram');closeM();
     modal(`<div class="mh"><h3>IMPORTA DA INSTAGRAM</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
@@ -141,10 +196,10 @@
       <div class="field"><label for="impDescription">Descrizione</label><textarea id="impDescription" style="min-height:150px">${esc(d.description||'')}</textarea></div>
       <div class="field"><label for="impVariants">Varianti</label><textarea id="impVariants">${esc(d.variants||'')}</textarea></div>
       <div class="field"><label for="impNotes">Note</label><textarea id="impNotes">${esc(d.notes||'')}</textarea></div>
-      ${currentFiles.length?`<details class="card"><summary>Immagini originali (${currentFiles.length})</summary>${currentFiles.map(file=>`<img src="${previewUrl(file)}" alt="${esc(file.name)}" style="display:block;width:100%;max-height:300px;object-fit:contain;margin-top:8px">`).join('')}</details><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva ${currentFiles.length>1?'le immagini originali':'l’immagine originale'}</label>`:''}
+      ${currentFiles.length?importSource==='pdf'?`<div class="card"><b>PDF originale</b><p class="muted">${esc(currentFile.name)}</p></div><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva il PDF originale</label>`:`<details class="card"><summary>Immagini originali (${currentFiles.length})</summary>${currentFiles.map(file=>`<img src="${previewUrl(file)}" alt="${esc(file.name)}" style="display:block;width:100%;max-height:300px;object-fit:contain;margin-top:8px">`).join('')}</details><label class="import-option"><input type="checkbox" id="impSaveImages" ${d.saveImages===false?'':'checked'}>Salva ${currentFiles.length>1?'le immagini originali':'l’immagine originale'}</label>`:''}
       <label class="import-option"><input type="checkbox" id="impSaveText" ${d.saveText===false?'':'checked'}>Salva il testo trascritto</label>
       <details class="card" style="margin-bottom:12px"><summary>Controlla testo trascritto</summary><div class="field"><label for="impTranscript">Testo trascritto (modificabile)</label><textarea id="impTranscript" style="min-height:160px">${esc(d.transcript??currentOcr)}</textarea></div></details>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openDiagramEditor()"><i data-lucide="goal"></i>Ricrea schema grafico</button><button class="btn" id="saveImportedExerciseBtn" onclick="saveImportedExercise()"><i data-lucide="save"></i>Salva esercizio</button></div>`);
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" onclick="openDiagramEditor()"><i data-lucide="goal"></i>Ricrea schema grafico</button><button class="btn" id="saveImportedExerciseBtn" onclick="saveImportedExercise()"><i data-lucide="save"></i>${importSource==='pdf'&&pdfDraftIndex<pdfDrafts.length-1?'Salva e continua':'Salva esercizio'}</button></div>`);
   };
   function draftSnapshot(){return {title:textVal('impTitle'),category:textVal('impCategory'),duration:textVal('impDuration'),objective:textVal('impObjective'),space:textVal('impSpace'),equipment:textVal('impEquipment'),description:textVal('impDescription'),variants:textVal('impVariants'),notes:textVal('impNotes'),transcript:textVal('impTranscript'),saveImages:checked('impSaveImages'),saveText:checked('impSaveText')};}
   function renderDiagram(){
@@ -196,9 +251,9 @@
       const batch=crypto.randomUUID();
       for(let i=0;i<files.length;i++){
         const file=files[i],path=`${user.id}/${batch}-${i}-${safe(file.name)}`;
-        const up=await client.storage.from('exercise-images').upload(path,file,{cacheControl:'3600',upsert:false});
+        const up=await client.storage.from('exercise-images').upload(path,file,{cacheControl:'3600',contentType:file.type||undefined,upsert:false});
         if(up.error)throw up.error;
-        uploaded.push({path,name:file.name});
+        uploaded.push({path,name:file.name,type:file.type||null});
       }
       row.source_images=uploaded;
       row.source_image_path=uploaded[0]?.path||null;
@@ -206,7 +261,10 @@
       const ins=await client.from('exercises').insert(row);if(ins.error)throw ins.error;
       inserted=true;
       if(typeof window.osgbReloadExercises==='function')await window.osgbReloadExercises();
-      if(version===operation&&btn?.isConnected){resetImport('image');window.__exerciseFilter=row.source_type;closeM();exercises(row.source_type);}
+      if(version===operation&&btn?.isConnected){
+        if(importSource==='pdf'&&pdfDraftIndex<pdfDrafts.length-1){pdfDraftIndex++;openPdfDraft(pdfDraftIndex);}
+        else{resetImport('image');window.__exerciseFilter=row.source_type;closeM();exercises(row.source_type);}
+      }
     }catch(err){
       if(!inserted&&uploaded.length){
         try{const removed=await client.storage.from('exercise-images').remove(uploaded.map(x=>x.path));if(removed.error)console.warn('Pulizia immagini incompleta',removed.error);}catch(cleanupError){console.warn('Pulizia immagini incompleta',cleanupError);}

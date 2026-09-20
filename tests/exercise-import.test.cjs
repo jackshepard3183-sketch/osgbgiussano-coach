@@ -21,7 +21,7 @@ async function app(){
       delete:()=>({eq:async(_,id)=>{state.rows=state.rows.filter(x=>x.id!==id);return {error:null};}})}),
     storage:{from:()=>({upload:async(p,file)=>{if(state.failUpload===state.uploads.length+1)return {error:new Error('upload failed')};state.uploads.push(p);return {error:null};},
       remove:async paths=>{state.removed.push(...paths);return {error:null};},createSignedUrl:async p=>({data:{signedUrl:'https://example.test/'+p}})})}};
-  const ctx={document,URL,DOMParser,XMLSerializer:class{serializeToString(node){return node.toString();}},crypto:webcrypto,AbortController,setTimeout,clearTimeout,console:{error(){},warn(){}},
+  const ctx={document,URL,Uint8Array,DOMParser,XMLSerializer:class{serializeToString(node){return node.toString();}},crypto:webcrypto,AbortController,setTimeout,clearTimeout,console:{error(){},warn(){}},
     CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},
     addEventListener:(name,fn)=>(state.events[name]??=[]).push(fn),
     dispatchEvent:event=>(state.events[event.type]||[]).forEach(fn=>fn(event)),
@@ -52,6 +52,12 @@ test('structured OCR separates fields and preserves multiline notes/variants',as
   const single='Esercizio di conduzione con passaggio finale al compagno.';assert.equal(ctx.osgbExerciseImport.parseText(single).description,single);
 });
 
+test('PDF exercise splitter recognizes two titled exercises in the same document',async()=>{
+  const {ctx}=await app();
+  const chunks=ctx.osgbExerciseImport.splitExercises('Titolo: Slalom\nObiettivo: Conduzione\nDescrizione: Primo\nTitolo: Duello\nObiettivo: Collaborazione\nDescrizione: Secondo');
+  assert.equal(chunks.length,2);assert.equal(ctx.osgbExerciseImport.parseText(chunks[0]).title,'Slalom');assert.equal(ctx.osgbExerciseImport.parseText(chunks[1]).title,'Duello');
+});
+
 test('readable Instagram link creates and saves a draft without an image',async()=>{
   const {ctx,state,document,value}=await app();
   ctx.fetch=async()=>({ok:true,text:async()=>'<html><head><meta property="og:description" content="12 likes, coach on September 20: &quot;Le porte&#10;Obiettivo: Conduzione&#10;Materiale: Cinesini&#10;Note: Due turni&quot;"></head></html>'});
@@ -75,6 +81,26 @@ test('multiple screenshots are transcribed, saved, displayed and removed togethe
   const row=state.rows[0];assert.equal(calls,2);assert.equal(row.source_images.length,2);assert.equal(state.uploads.length,2);assert.match(row.source_ocr_text,/Due turni/);assert.equal(row.notes,'Due turni');
   await ctx.openExerciseDetail(row.id);assert.equal(document.querySelectorAll('.exercise-source-image').length,2);assert.match(document.body.textContent,/Testo trascritto/);
   await ctx.deleteExerciseAdmin(row.id);assert.equal(state.rows.length,0);assert.equal(new Set(state.removed).size,2);
+});
+
+test('PDF text is extracted into an editable draft and the private original is saved',async()=>{
+  const {ctx,state,document}=await app();
+  ctx.pdfjsLib={getDocument:()=>({promise:Promise.resolve({numPages:2,getPage:async n=>({getTextContent:async()=>({items:n===1?[{str:'Titolo: Slalom',hasEOL:true},{str:'Obiettivo: Conduzione',hasEOL:true},{str:'Materiale: Cinesini'}]:[{str:'Continua guidando tra i coni'}]})})})})};
+  const pdf=new File(['%PDF-test'],'slalom.pdf',{type:'application/pdf'});pdf.arrayBuffer=async()=>new TextEncoder().encode('%PDF-test').buffer;
+  ctx.importExercisePdf();ctx.previewExercisePdf({files:[pdf],value:''});await ctx.readExercisePdf();
+  assert.equal(document.getElementById('impTitle').value,'Slalom');assert.match(document.getElementById('impTranscript').value,/guidando tra i coni/);
+  await ctx.saveImportedExercise();const row=state.rows[0];assert.equal(row.source_type,'pdf');assert.equal(row.source_images[0].type,'application/pdf');assert.match(row.source_images[0].name,/slalom\.pdf/);
+  await ctx.openExerciseDetail(row.id);assert.match(document.body.textContent,/PDF originale/);assert.equal(document.querySelectorAll('.exercise-source-image').length,0);
+});
+
+test('two exercises in one PDF are reviewed and saved as separate records',async()=>{
+  const {ctx,state,document}=await app();
+  ctx.pdfjsLib={getDocument:()=>({promise:Promise.resolve({numPages:1,getPage:async()=>({getTextContent:async()=>({items:[{str:'Titolo: Slalom',hasEOL:true},{str:'Obiettivo: Conduzione',hasEOL:true},{str:'Descrizione: Primo esercizio',hasEOL:true},{str:'Titolo: Duello',hasEOL:true},{str:'Obiettivo: Collaborazione',hasEOL:true},{str:'Descrizione: Secondo esercizio'}]})})})})};
+  const pdf=new File(['%PDF-double'],'doppio.pdf',{type:'application/pdf'});pdf.arrayBuffer=async()=>new TextEncoder().encode('%PDF-double').buffer;
+  ctx.importExercisePdf();ctx.previewExercisePdf({files:[pdf],value:''});await ctx.readExercisePdf();
+  assert.equal(document.getElementById('impTitle').value,'Slalom');assert.match(document.body.textContent,/1 di 2/);await ctx.saveImportedExercise();
+  assert.equal(document.getElementById('impTitle').value,'Duello');assert.match(document.body.textContent,/2 di 2/);await ctx.saveImportedExercise();
+  assert.deepEqual(state.rows.map(x=>x.title),['Slalom','Duello']);assert.equal(state.uploads.length,2);assert.equal(ctx.__exerciseFilter,'pdf');
 });
 
 test('save options and edited fields survive the diagram round trip',async()=>{
@@ -110,9 +136,9 @@ test('stale link responses do not replace a new image import',async()=>{
   assert.ok(document.getElementById('imgExerciseFile'));assert.equal(document.getElementById('impTitle'),null);
 });
 
-test('archive filters include Instagram in requested order and do not classify it as manual',async()=>{
+test('archive filters include PDF and Instagram in requested order and do not classify them as manual',async()=>{
   const {ctx,state,document}=await app();state.rows=Object.keys(ctx.osgbExerciseImport.labels).map((source_type,id)=>({id:String(id),title:source_type,source_type}));await ctx.osgbReloadExercises();ctx.exercises();
-  const text=document.body.textContent;assert.ok(text.indexOf('📷 Immagini ·')<text.indexOf('🌐 Web ·'));assert.ok(text.indexOf('🌐 Web ·')<text.indexOf('📱 Instagram ·'));assert.ok(text.indexOf('📱 Instagram ·')<text.indexOf('✍️ Manuali ·'));
+  const text=document.body.textContent;assert.ok(text.indexOf('📷 Immagini ·')<text.indexOf('📄 PDF ·'));assert.ok(text.indexOf('📄 PDF ·')<text.indexOf('🌐 Web ·'));assert.ok(text.indexOf('🌐 Web ·')<text.indexOf('📱 Instagram ·'));assert.ok(text.indexOf('📱 Instagram ·')<text.indexOf('✍️ Manuali ·'));
   ctx.exercises('instagram');assert.equal(document.querySelectorAll('.card').length,1);assert.match(document.querySelector('.card').textContent,/instagram/);assert.equal(document.querySelectorAll('#m').length,1);
 });
 

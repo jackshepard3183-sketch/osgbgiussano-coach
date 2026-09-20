@@ -1,5 +1,5 @@
 (function(){
-  const labels={ai:'✨ AI',local:'⚙️ App',image:'📷 Immagini',web:'🌐 Web',instagram:'📱 Instagram',manual:'✍️ Manuali'};
+  const labels={ai:'✨ AI',local:'⚙️ App',image:'📷 Immagini',pdf:'📄 PDF',web:'🌐 Web',instagram:'📱 Instagram',manual:'✍️ Manuali'};
   const sourceType=value=>Object.hasOwn(labels,value)?value:'manual';
   const sourceLabel=value=>labels[sourceType(value)];
 
@@ -39,6 +39,17 @@
     return {title:(fields.title||plain[0]||'Esercizio importato').slice(0,110),category,duration:(fields.duration||'').match(/\d{1,3}/)?.[0]||'',objective:fields.objective||'',space:fields.space||'',equipment:fields.equipment||'',description:fields.description||(plain.length===1?plain[0]:plain.slice(fields.title?0:1).join('\n')),variants:fields.variants||'',notes:fields.notes||''};
   }
 
+  function splitExercises(text,pageTexts=[]){
+    const source=String(text||'').trim();if(!source)return [];
+    const byTitle=source.split(/(?=^\s*Titolo\s*[:–-])/gim).map(x=>x.trim()).filter(Boolean);
+    if(byTitle.length>1)return byTitle;
+    const byNumber=source.split(/(?=^\s*(?:Esercizio|Esercitazione)\s*(?:n\.?\s*)?\d+\s*[:–-]?)/gim).map(x=>x.trim()).filter(Boolean);
+    if(byNumber.length>1)return byNumber;
+    const pages=pageTexts.map(x=>String(x||'').trim()).filter(Boolean);
+    const exercisePages=pages.filter(x=>/(?:titolo|esercizio|esercitazione|obiettiv[oi]|descrizione|svolgimento|materiale)\s*[:–-]?/i.test(x)&&x.length>=30);
+    return exercisePages.length>1&&exercisePages.length===pages.length?pages:[source];
+  }
+
   function sourceImages(exercise){
     const images=Array.isArray(exercise.source_images)?exercise.source_images:[];
     const all=[...images];
@@ -46,5 +57,5 @@
     const seen=new Set();
     return all.filter(x=>x&&typeof x.path==='string'&&x.path&&!seen.has(x.path)&&seen.add(x.path));
   }
-  window.osgbExerciseImport={parseText,instagramUrl,sourceImages,sourceType,sourceLabel,labels};
+  window.osgbExerciseImport={parseText,splitExercises,instagramUrl,sourceImages,sourceType,sourceLabel,labels};
 })();
