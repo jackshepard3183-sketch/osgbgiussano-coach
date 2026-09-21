@@ -1,4 +1,4 @@
-const CACHE='osgb-coach-v55';
+const CACHE='osgb-coach-v56';
 const ASSETS=['./',
 './index.html',
 './styles.css',
@@ -45,6 +45,8 @@ const ASSETS=['./',
 './pwa.js',
 './logo-osgb.png',
 './android-icon-192.png',
+'./android-icon-512.png',
+'./icon-192.png',
 './icon-512.png',
 './manifest.webmanifest'];
 self.addEventListener('install',
