@@ -1,0 +1,60 @@
+.attendance-tabs {
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.attendance-tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.attendance-tabs .tab svg,
+.attendance-day-badge svg {
+  width: 17px;
+  height: 17px;
+}
+
+.attendance-date-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: end;
+  gap: 9px;
+}
+
+.attendance-date-row > .sbtn {
+  margin-bottom: 10px;
+}
+
+.attendance-date-field {
+  min-width: 0;
+}
+
+.attendance-date-field select {
+  text-transform: capitalize;
+}
+
+.attendance-day-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.attendance-day-badge.match {
+  background: var(--accent-soft);
+  color: #6e5d00;
+}
+
+.btn:disabled,
+.sbtn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
