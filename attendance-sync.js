@@ -1,4 +1,5 @@
 (function(){
+  const SEASON_START='2026-09-10';
   let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[];
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -18,15 +19,21 @@
   function isMatchDay(date){const d=new Date(date+'T12:00:00');return d.getDay()===0||d.getDay()===6;}
   function dayLabel(date){return new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).format(new Date(date+'T12:00:00'));}
   function allowedDay(date,mode=attendanceMode){return mode==='training'?isStandardTrainingDay(date):isMatchDay(date);}
+  function firstAllowedDate(mode){
+    const d=new Date(SEASON_START+'T12:00:00');
+    while(!allowedDay(isoLocal(d),mode))d.setDate(d.getDate()+1);
+    return isoLocal(d);
+  }
   function nearestAllowedDate(from,mode,direction=0){
     const d=new Date((from||isoLocal(new Date()))+'T12:00:00');
     if(direction)d.setDate(d.getDate()+direction);
     while(!allowedDay(isoLocal(d),mode))d.setDate(d.getDate()+(direction<0?-1:1));
-    return isoLocal(d);
+    return isoLocal(d)<firstAllowedDate(mode)?firstAllowedDate(mode):isoLocal(d);
   }
   function relevantDates(mode){
     const center=new Date(currentDate+'T12:00:00'),start=new Date(center),end=new Date(center),out=[];
     start.setDate(start.getDate()-84);end.setDate(end.getDate()+112);
+    if(start<new Date(SEASON_START+'T12:00:00'))start.setTime(new Date(SEASON_START+'T12:00:00').getTime());
     for(const d=new Date(start);d<=end;d.setDate(d.getDate()+1))if(allowedDay(isoLocal(d),mode))out.push(isoLocal(d));
     return out;
   }
@@ -40,7 +47,7 @@
 
   async function loadHistory(){
     if(!client||!user)return;
-    const {data,error}=await client.from('events').select('id,event_date,title,event_type,start_time,attendance(status)').eq('owner_user_id',user.id).lte('event_date',isoLocal(new Date())).order('event_date',{ascending:false}).limit(80);
+    const {data,error}=await client.from('events').select('id,event_date,title,event_type,start_time,attendance(status)').eq('owner_user_id',user.id).gte('event_date',SEASON_START).lte('event_date',isoLocal(new Date())).order('event_date',{ascending:false}).limit(80);
     if(error){console.warn('attendance history',error);return;}
     history=(data||[]).filter(e=>e.event_type==='training'||isMatchDay(e.event_date)).map(e=>{
       const rows=e.attendance||[],counts={present:0,absent:0,late:0,unavailable:0};rows.forEach(r=>{if(counts[r.status]!==undefined)counts[r.status]++;});
@@ -93,6 +100,7 @@
 
   window.setAttendanceDate=async function(v){
     if(!v)return;
+    v=nearestAllowedDate(v,attendanceMode,0);
     try{ready=false;currentDate=v;render();await loadAttendance(v);}catch(e){alert('Errore nel caricamento delle presenze.');}
   };
 
@@ -107,6 +115,7 @@
   };
 
   window.openAttendanceHistory=async function(date,type){
+    if(date<SEASON_START)return;
     attendanceMode=type==='training'?'training':'match';currentDate=date;ready=false;render();
     try{await loadAttendance(date);}catch(e){alert('Errore nel caricamento del dettaglio presenze.');}
   };
