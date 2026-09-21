@@ -1,24 +1,43 @@
 (function(){
   let installPrompt=null;
+  let installReadyResolve=null;
+  let installReady=new Promise(resolve=>{installReadyResolve=resolve});
   function addStyle(){
     if(document.getElementById('pwaStyle'))return;
     const s=document.createElement('style');s.id='pwaStyle';
-    s.textContent='.pwa-install,.offline-badge{border:0;border-radius:999px;font:inherit;font-weight:700}.pwa-install{background:#f4d018;color:#173c7a;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1;padding:0 14px;height:38px;min-width:88px;vertical-align:middle}.pwa-login-install{width:100%;height:46px;margin-top:12px;border-radius:12px;font-size:14px}.pwa-install-help{position:fixed;inset:0;z-index:1200;background:rgba(7,20,46,.62);display:flex;align-items:center;justify-content:center;padding:20px}.pwa-install-help-card{width:min(420px,100%);background:#fff;border-radius:20px;padding:22px;color:#17396f;box-shadow:0 24px 70px rgba(7,20,46,.25)}.pwa-install-help-card h2{margin:0 0 10px;font-size:23px}.pwa-install-help-card p{margin:8px 0;line-height:1.45;color:#52617a}.pwa-install-help-card button{width:100%;margin-top:12px;padding:12px;border:0;border-radius:11px;background:#245ab7;color:#fff;font:inherit;font-weight:800}.offline-badge{background:#fff3cd;color:#7a5a00;display:none;margin-left:6px;padding:8px 10px}.offline-badge.on{display:inline-flex}@media(max-width:480px){.pwa-install{height:36px;min-width:72px;padding:0 13px;font-size:12px;line-height:1}.pwa-login-install{height:44px;font-size:13px}.offline-badge{font-size:10px;padding:6px 8px}}';
+    s.textContent='.pwa-install,.offline-badge{border:0;border-radius:999px;font:inherit;font-weight:700}.pwa-install{background:#f4d018;color:#173c7a;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1;padding:0 14px;height:38px;min-width:88px;vertical-align:middle}.pwa-install:disabled{cursor:wait;opacity:.72}.pwa-login-install{width:100%;height:46px;margin-top:12px;border-radius:12px;font-size:14px}.pwa-install-help{position:fixed;inset:0;z-index:1200;background:rgba(7,20,46,.62);display:flex;align-items:center;justify-content:center;padding:20px}.pwa-install-help-card{width:min(420px,100%);background:#fff;border-radius:20px;padding:22px;color:#17396f;box-shadow:0 24px 70px rgba(7,20,46,.25)}.pwa-install-help-card h2{margin:0 0 10px;font-size:23px}.pwa-install-help-card p{margin:8px 0;line-height:1.45;color:#52617a}.pwa-install-help-card button{width:100%;margin-top:12px;padding:12px;border:0;border-radius:11px;background:#245ab7;color:#fff;font:inherit;font-weight:800}.offline-badge{background:#fff3cd;color:#7a5a00;display:none;margin-left:6px;padding:8px 10px}.offline-badge.on{display:inline-flex}@media(max-width:480px){.pwa-install{height:36px;min-width:72px;padding:0 13px;font-size:12px;line-height:1}.pwa-login-install{height:44px;font-size:13px}.offline-badge{font-size:10px;padding:6px 8px}}';
     document.head.appendChild(s);
   }
   function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
   function isIos(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}
-  function isInAppBrowser(){return /FBAN|FBAV|Instagram|Line\//i.test(navigator.userAgent)||/; wv\)/i.test(navigator.userAgent)}
+  function isAndroid(){return /android/i.test(navigator.userAgent)}
+  function isInAppBrowser(){return /FBAN|FBAV|Instagram|Line\/|ChatGPT|;\s*wv\b/i.test(navigator.userAgent)}
   function showInstallHelp(){
     document.getElementById('pwaInstallHelp')?.remove();
     const wrap=document.createElement('div');wrap.id='pwaInstallHelp';wrap.className='pwa-install-help';
     let instructions='Apri il menu del browser (⋮) e scegli <strong>Installa app</strong> oppure <strong>Aggiungi a schermata Home</strong>.';
-    if(isIos())instructions='Apri il menu <strong>Condividi</strong> di Safari e scegli <strong>Aggiungi alla schermata Home</strong>.';
-    else if(isInAppBrowser())instructions='Questo browser interno non consente l’installazione. Apri la pagina in <strong>Chrome</strong>, poi usa il menu (⋮) e scegli <strong>Installa app</strong>.';
-    wrap.innerHTML=`<div class="pwa-install-help-card"><h2>Installa OSGB Coach</h2><p>${instructions}</p><p>L’app resterà disponibile dalla schermata Home del telefono.</p><button type="button">Ho capito</button></div>`;
+    if(isIos())instructions='Apri questa pagina in <strong>Safari</strong>, tocca <strong>Condividi</strong> e scegli <strong>Aggiungi alla schermata Home</strong>.';
+    else if(isInAppBrowser())instructions='Questo browser interno non può installare l’app. Usa il menu e scegli <strong>Apri in Chrome</strong>, poi premi di nuovo <strong>Installa app</strong>.';
+    else if(isAndroid())instructions='In <strong>Chrome</strong>, aggiorna la pagina e attendi qualche secondo. Poi premi di nuovo <strong>Installa app</strong>; in alternativa usa il menu (⋮) e scegli <strong>Installa app</strong>.';
+    wrap.innerHTML=`<div class="pwa-install-help-card"><h2>Installa OSGB Coach</h2><p>${instructions}</p><p>L’icona OSGB verrà aggiunta alla schermata Home.</p><button type="button">Ho capito</button></div>`;
     wrap.querySelector('button').addEventListener('click',()=>wrap.remove());wrap.addEventListener('click',e=>{if(e.target===wrap)wrap.remove()});document.body.appendChild(wrap);
   }
-  async function startInstall(){if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;syncInstallButtons();return}showInstallHelp()}
+  function setBusy(busy){document.querySelectorAll('#installCoach,#installCoachLogin').forEach(b=>{b.disabled=busy;b.dataset.oldText=b.dataset.oldText||b.textContent;if(busy)b.textContent='Preparazione…';else if(b.dataset.oldText)b.textContent=b.dataset.oldText})}
+  async function startInstall(){
+    if(!installPrompt&&!isIos()&&!isInAppBrowser()){
+      setBusy(true);
+      await Promise.race([installReady,new Promise(resolve=>setTimeout(resolve,1800))]);
+      setBusy(false);
+    }
+    if(installPrompt){
+      const prompt=installPrompt;installPrompt=null;
+      await prompt.prompt();
+      await prompt.userChoice;
+      syncInstallButtons();
+      return;
+    }
+    showInstallHelp();
+  }
   function headerInstallButton(){
     if(document.getElementById('installCoach'))return document.getElementById('installCoach');
     const badge=document.querySelector('.top-badge');if(!badge)return null;
@@ -34,8 +53,9 @@
   function offlineBadge(){if(document.getElementById('offlineCoach'))return document.getElementById('offlineCoach');const header=document.querySelector('.top');if(!header)return null;const span=document.createElement('span');span.id='offlineCoach';span.className='offline-badge';span.textContent='Offline';header.appendChild(span);return span}
   function syncOnline(){const b=offlineBadge();if(b)b.classList.toggle('on',!navigator.onLine)}
   addStyle();syncInstallButtons();offlineBadge();syncOnline();new MutationObserver(syncInstallButtons).observe(document.body,{childList:true,subtree:true});
-  window.addEventListener('resize',()=>{const b=document.getElementById('installCoach');if(b)b.textContent=window.matchMedia('(max-width:480px)').matches?'Installa':'Installa app'});
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;syncInstallButtons()});window.addEventListener('appinstalled',()=>{installPrompt=null;syncInstallButtons()});
+  window.addEventListener('resize',()=>{const b=document.getElementById('installCoach');if(b&&!b.disabled)b.textContent=window.matchMedia('(max-width:480px)').matches?'Installa':'Installa app'});
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;if(installReadyResolve){installReadyResolve();installReadyResolve=null}syncInstallButtons()});
+  window.addEventListener('appinstalled',()=>{installPrompt=null;syncInstallButtons()});
   window.addEventListener('online',syncOnline);window.addEventListener('offline',syncOnline);
-  if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker non registrato',err));});}
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker non registrato',err));}
 })();
