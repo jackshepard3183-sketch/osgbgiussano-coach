@@ -1,5 +1,5 @@
 (function(){
-  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training';
+  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[];
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
@@ -32,9 +32,20 @@
   }
 
   async function refreshDerived(){
+    await loadHistory();
     if(typeof window.osgbReloadPlayerStats==='function')await window.osgbReloadPlayerStats();
     if(typeof window.osgbReloadSeasonStats==='function')await window.osgbReloadSeasonStats();
     if(typeof window.osgbReloadDashboard==='function')await window.osgbReloadDashboard();
+  }
+
+  async function loadHistory(){
+    if(!client||!user)return;
+    const {data,error}=await client.from('events').select('id,event_date,title,event_type,start_time,attendance(status)').eq('owner_user_id',user.id).lte('event_date',isoLocal(new Date())).order('event_date',{ascending:false}).limit(80);
+    if(error){console.warn('attendance history',error);return;}
+    history=(data||[]).filter(e=>e.event_type==='training'||isMatchDay(e.event_date)).map(e=>{
+      const rows=e.attendance||[],counts={present:0,absent:0,late:0,unavailable:0};rows.forEach(r=>{if(counts[r.status]!==undefined)counts[r.status]++;});
+      return {...e,counts,total:rows.length};
+    });
   }
 
   async function findEvent(date,mode=attendanceMode){
@@ -95,6 +106,11 @@
     setAttendanceDate(nearestAllowedDate(currentDate,attendanceMode,direction<0?-1:1));
   };
 
+  window.openAttendanceHistory=async function(date,type){
+    attendanceMode=type==='training'?'training':'match';currentDate=date;ready=false;render();
+    try{await loadAttendance(date);}catch(e){alert('Errore nel caricamento del dettaglio presenze.');}
+  };
+
   window.markAllPresent=async function(){
     if(!client||!user)return;
     if(!eventId&&attendanceMode==='match'){alert('Prima inserisci la partita nel Calendario.');return;}
@@ -112,12 +128,13 @@
     const options=dates.map(d=>`<option value="${d}" ${d===currentDate?'selected':''}>${esc(dayLabel(d))}</option>`).join('');
     const message=attendanceMode==='match'&&!eventId?'Nessuna partita programmata in questa data: inseriscila prima nel Calendario.':eventId?'Salvataggio automatico su Supabase.':'Nessuna presenza ancora registrata per questa data.';
     const players=P.map((p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`).join('');
-    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div><div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&!eventId?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div><div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">GIOCATORI · ${total}</div>${players}`;
+    const historyList=history.length?history.map(h=>`<button class="attendance-history-item" onclick='openAttendanceHistory(${JSON.stringify(h.event_date)},${JSON.stringify(h.event_type)})'><span class="attendance-history-icon ${h.event_type==='training'?'training':'match'}"><i data-lucide="${h.event_type==='training'?'dumbbell':'trophy'}"></i></span><span class="attendance-history-main"><b>${esc(h.title||(h.event_type==='training'?'Allenamento':'Partita'))}</b><small>${esc(dayLabel(h.event_date))}</small></span><span class="attendance-history-recap"><b>${h.counts.present+h.counts.late}/${h.total||P.length}</b><small>presenti</small></span><i data-lucide="chevron-right"></i></button>`).join(''):'<p class="muted">Nessuna attività svolta ancora disponibile.</p>';
+    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div><div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&!eventId?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div><div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">GIOCATORI · ${total}</div>${players}<div class="section">ATTIVITÀ SVOLTE</div><div class="card attendance-history">${historyList}</div>`;
   };
 
   window.addEventListener('osgb-auth-ready',async e=>{
     client=e.detail?.client;if(!client)return;
     const {data}=await client.auth.getUser();user=data?.user;if(!user)return;
-    await waitRoster();try{await loadAttendance(currentDate);}catch(_){ready=false;}
+    await waitRoster();await loadHistory();try{await loadAttendance(currentDate);}catch(_){ready=false;}
   });
 })();
