@@ -11,3 +11,5 @@
 .exercise-library-diagram-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--muted);cursor:default;font-size:12px;font-weight:700;text-align:center}
 .exercise-library-diagram-empty .icon{width:28px;height:28px;color:var(--primary)}
 @media(max-width:480px){.exercise-library-diagram{height:165px}}
+.training-exercise-development{display:grid;grid-template-columns:minmax(220px,42%) 1fr;gap:14px;margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:16px;background:#f8fbff}.training-exercise-svg{display:block;width:100%;height:auto;max-height:270px;border-radius:13px;background:#176d42}.training-exercise-copy p{margin:7px 0;line-height:1.45}.training-station h4{margin:7px 0}.training-exercise-row{align-items:flex-start}.training-exercise-row .body{min-width:0}
+@media(max-width:680px){.training-exercise-development{grid-template-columns:1fr}.training-exercise-svg{max-height:none}.training-exercise-row{display:grid;grid-template-columns:72px minmax(0,1fr)}}
