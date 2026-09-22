@@ -30,11 +30,11 @@
       candidates.push({
         owner_user_id:user.id,
         title,
-        category:x.category||'Generato con AI',
+        category:window.osgbExerciseImport.normalizeCategory(x.category,x.title,x.objective,x.description),
         duration_minutes:Number(x.duration_minutes||duration)||null,
         objective:x.objective||null,
         space:x.space||null,
-        equipment:x.equipment||null,
+        equipment:window.osgbExerciseImport.normalizeEquipment(x.equipment)||null,
         description:x.description||null,
         variants:x.variants||null,
         source_type:'ai',
@@ -106,7 +106,7 @@
     const title=document.getElementById('exTitle')?.value.trim();
     if(!title){alert('Inserisci il titolo.');return;}
     const btn=document.getElementById('saveExerciseBtn');if(btn){btn.disabled=true;btn.textContent='Salvataggio…';}
-    const row={owner_user_id:user.id,title,category:document.getElementById('exCategory')?.value.trim()||null,duration_minutes:parseInt(document.getElementById('exDuration')?.value||'0',10)||null,objective:document.getElementById('exObjective')?.value.trim()||null,space:document.getElementById('exSpace')?.value.trim()||null,equipment:document.getElementById('exEquipment')?.value.trim()||null,description:document.getElementById('exDescription')?.value.trim()||null,variants:document.getElementById('exVariants')?.value.trim()||null,source_type:'manual'};
+    const objective=document.getElementById('exObjective')?.value.trim()||'',description=document.getElementById('exDescription')?.value.trim()||'';const row={owner_user_id:user.id,title,category:window.osgbExerciseImport.normalizeCategory(document.getElementById('exCategory')?.value,title,objective,description),duration_minutes:parseInt(document.getElementById('exDuration')?.value||'0',10)||null,objective:objective||null,space:document.getElementById('exSpace')?.value.trim()||null,equipment:window.osgbExerciseImport.normalizeEquipment(document.getElementById('exEquipment')?.value)||null,description:description||null,variants:document.getElementById('exVariants')?.value.trim()||null,source_type:'manual'};
     const {error}=await client.from('exercises').insert(row);
     if(error){console.error('exercise save',error);alert('Impossibile salvare l’esercizio.');if(btn){btn.disabled=false;btn.textContent='Salva esercizio';}return;}
     await loadExercises();closeM();exercises();

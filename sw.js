@@ -1,4 +1,4 @@
-const CACHE='osgb-coach-v68';
+const CACHE='osgb-coach-v69';
 const ASSETS=['./',
 './index.html',
 './styles.css',

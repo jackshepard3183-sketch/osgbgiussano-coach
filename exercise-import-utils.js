@@ -2,6 +2,30 @@
   const labels={ai:'✨ AI',local:'⚙️ App',image:'📷 Immagini',pdf:'📄 PDF',web:'🌐 Web',instagram:'📱 Instagram',manual:'✍️ Manuali'};
   const sourceType=value=>Object.hasOwn(labels,value)?value:'manual';
   const sourceLabel=value=>labels[sourceType(value)];
+  const categories=['Riscaldamento','Attivazione motoria','Tecnica – conduzione','Tecnica – conduzione e tiro','Situazionale – 1 contro 1','Situazionale – 2 contro 2','Partita'];
+
+  function normalizeCategory(value,title='',objective='',description=''){
+    const category=String(value||'').trim(),text=[title,category,objective,description].join(' ').toLowerCase();
+    if(/(2\s*(contro|c)\s*2|due contro due|torneo di 2)/.test(text))return'Situazionale – 2 contro 2';
+    if(/(1\s*(contro|c)\s*1|uno contro uno|duello|protezione dorsale|difesa della palla)/.test(text))return'Situazionale – 1 contro 1';
+    if(/(partita|partitella|3\s*(contro|c)\s*3|4\s*(contro|c)\s*4|5\s*(contro|c)\s*5|rugby con meta|palla prigioniera|palla rilanciata)/.test(text))return'Partita';
+    if(/^(gioco motorio|riscaldamento)$/i.test(category))return'Riscaldamento';
+    if(/^(attivazione motoria|percorso motorio)$/i.test(category))return'Attivazione motoria';
+    if(/situazional/i.test(category))return'Partita';
+    if(/(finalizz|tiro|calcia|rigor|porta vuota)/.test(text))return'Tecnica – conduzione e tiro';
+    return'Tecnica – conduzione';
+  }
+
+  function normalizeEquipment(value){
+    const text=String(value||'').toLowerCase(),out=[];
+    if(/pallon/.test(text))out.push('Palloni');
+    if(/(cinesin|conett)/.test(text))out.push('Cinesini');
+    if(/cerch/.test(text))out.push('Cerchi');
+    if(/(porta|porte)/.test(text))out.push('Porticine');
+    if(/(^|[^a-zà-ÿ])coni([^a-zà-ÿ]|$)/.test(text))out.push('Coni');
+    if(/(ostacol|palett|scalett|nastro|medus|cancellet)/.test(text))out.push('Ostacoli');
+    return out.join(', ');
+  }
 
   function instagramUrl(value){
     let url;
@@ -39,7 +63,8 @@
       else if(low.includes('finalizz'))category='Finalizzazione';
       else if(low.includes('possesso'))category='Gioco e collaborazione';
     }
-    return {title:(fields.title||plain[0]||'Esercizio importato').slice(0,110),category,duration:(fields.duration||'').match(/\d{1,3}/)?.[0]||'',objective:fields.objective||'',space:fields.space||'',equipment:fields.equipment||'',description:fields.description||(plain.length===1?plain[0]:plain.slice(fields.title?0:1).join('\n')),variants:fields.variants||'',notes:fields.notes||''};
+    const title=(fields.title||plain[0]||'Esercizio importato').slice(0,110),objective=fields.objective||'',description=fields.description||(plain.length===1?plain[0]:plain.slice(fields.title?0:1).join('\n'));
+    return {title,category:normalizeCategory(category,title,objective,description),duration:(fields.duration||'').match(/\d{1,3}/)?.[0]||'',objective,space:fields.space||'',equipment:normalizeEquipment(fields.equipment||''),description,variants:fields.variants||'',notes:fields.notes||''};
   }
 
   function splitExercises(text,pageTexts=[]){
@@ -64,5 +89,5 @@
     const seen=new Set();
     return all.filter(x=>x&&typeof x.path==='string'&&x.path&&!seen.has(x.path)&&seen.add(x.path));
   }
-  window.osgbExerciseImport={parseText,splitExercises,instagramUrl,sourceImages,sourceType,sourceLabel,labels};
+  window.osgbExerciseImport={parseText,splitExercises,instagramUrl,sourceImages,sourceType,sourceLabel,normalizeCategory,normalizeEquipment,categories,labels};
 })();

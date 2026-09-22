@@ -48,7 +48,7 @@ test('Instagram URL validation accepts posts/reels and removes tracking',async()
 test('structured OCR separates fields and preserves multiline notes/variants',async()=>{
   const {ctx}=await app();
   const d=ctx.osgbExerciseImport.parseText('Titolo: Le porte\nObiettivo: Conduzione\nMateriale: 6 cinesini\nDescrizione: Attraversare le porte.\nTornare al via.\nVarianti: Piede debole\nNote: Cambio ogni minuto\nDue turni\nDurata: 12 min');
-  assert.equal(d.title,'Le porte');assert.equal(d.objective,'Conduzione');assert.equal(d.equipment,'6 cinesini');assert.equal(d.duration,'12');assert.equal(d.description,'Attraversare le porte.\nTornare al via.');assert.equal(d.notes,'Cambio ogni minuto\nDue turni');
+  assert.equal(d.title,'Le porte');assert.equal(d.objective,'Conduzione');assert.equal(d.equipment,'Cinesini');assert.equal(d.duration,'12');assert.equal(d.description,'Attraversare le porte.\nTornare al via.');assert.equal(d.notes,'Cambio ogni minuto\nDue turni');
   const single='Esercizio di conduzione con passaggio finale al compagno.';assert.equal(ctx.osgbExerciseImport.parseText(single).description,single);
 });
 
@@ -76,7 +76,7 @@ test('ChatGPT field labels in bold on separate lines are recognized',async()=>{
   const text='### NUOVO ESERCIZIO\n\n**Titolo**\nLe porticine colorate\n**Categoria**\nConduzione\n**Durata**\n10 minuti\n**Obiettivo**\nControllo della palla\n**Spazio**\n20x20 m\n**Materiale**\nPalloni e cinesini\n**Descrizione**\nGuidare la palla nella porta chiamata.\n**Varianti**\nUsare il piede debole.';
   const chunks=ctx.osgbExerciseImport.splitExercises(text);
   const d=ctx.osgbExerciseImport.parseText(chunks[0]);
-  assert.equal(d.title,'Le porticine colorate');assert.equal(d.category,'Conduzione');assert.equal(d.duration,'10');assert.equal(d.objective,'Controllo della palla');assert.equal(d.space,'20x20 m');assert.equal(d.equipment,'Palloni e cinesini');assert.equal(d.description,'Guidare la palla nella porta chiamata.');assert.equal(d.variants,'Usare il piede debole.');
+  assert.equal(d.title,'Le porticine colorate');assert.equal(d.category,'Tecnica – conduzione');assert.equal(d.duration,'10');assert.equal(d.objective,'Controllo della palla');assert.equal(d.space,'20x20 m');assert.equal(d.equipment,'Palloni, Cinesini');assert.equal(d.description,'Guidare la palla nella porta chiamata.');assert.equal(d.variants,'Usare il piede debole.');
 });
 
 test('numbered ChatGPT exercises with repeated NUOVO ESERCIZIO headers import separately',async()=>{

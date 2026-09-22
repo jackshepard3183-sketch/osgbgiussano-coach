@@ -43,7 +43,7 @@
   };
   window.saveExerciseAdmin=async function(id){
     if(!client||!user)return;
-    const row={title:document.getElementById('exaTitle')?.value.trim()||'',category:document.getElementById('exaCategory')?.value.trim()||null,duration_minutes:parseInt(document.getElementById('exaDuration')?.value||'0',10)||null,objective:document.getElementById('exaObjective')?.value.trim()||null,space:document.getElementById('exaSpace')?.value.trim()||null,equipment:document.getElementById('exaEquipment')?.value.trim()||null,description:document.getElementById('exaDescription')?.value.trim()||null,variants:document.getElementById('exaVariants')?.value.trim()||null,notes:document.getElementById('exaNotes')?.value.trim()||null};
+    const title=document.getElementById('exaTitle')?.value.trim()||'',objective=document.getElementById('exaObjective')?.value.trim()||'',description=document.getElementById('exaDescription')?.value.trim()||'';const row={title,category:window.osgbExerciseImport.normalizeCategory(document.getElementById('exaCategory')?.value,title,objective,description),duration_minutes:parseInt(document.getElementById('exaDuration')?.value||'0',10)||null,objective:objective||null,space:document.getElementById('exaSpace')?.value.trim()||null,equipment:window.osgbExerciseImport.normalizeEquipment(document.getElementById('exaEquipment')?.value)||null,description:description||null,variants:document.getElementById('exaVariants')?.value.trim()||null,notes:document.getElementById('exaNotes')?.value.trim()||null};
     if(!row.title){alert('Inserisci il titolo.');return;}
     const {error}=await client.from('exercises').update(row).eq('id',id);
     if(error){console.error(error);alert('Impossibile aggiornare l’esercizio.');return;}

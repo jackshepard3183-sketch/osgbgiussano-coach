@@ -242,11 +242,11 @@
     var row={
       owner_user_id:user.id,
       title:title,
-      category:val('aiDCategory')||null,
+      category:window.osgbExerciseImport.normalizeCategory(val('aiDCategory'),title,val('aiDObjective'),val('aiDDescription')),
       duration_minutes:Number(val('aiDDuration'))||null,
       objective:val('aiDObjective')||null,
       space:val('aiDSpace')||null,
-      equipment:val('aiDEquipment')||null,
+      equipment:window.osgbExerciseImport.normalizeEquipment(val('aiDEquipment'))||null,
       description:val('aiDDescription')||null,
       variants:val('aiDVariants')||null,
       source_type:draft&&draft.source_type==='ai'?'ai':'local',
