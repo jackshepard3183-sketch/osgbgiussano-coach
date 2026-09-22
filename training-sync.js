@@ -28,7 +28,28 @@
   }
 
   function exercisePayload(ex){
-    return {title:ex.title,exercise_id:ex.id||null,category:ex.category||null,objective:ex.objective||null,space:ex.space||null,equipment:ex.equipment||null,description:ex.description||null,variants:ex.variants||null};
+    return {title:ex.title,exercise_id:ex.id||null,category:ex.category||null,objective:ex.objective||null,space:ex.space||null,equipment:ex.equipment||null,description:ex.description||null,variants:ex.variants||null,diagram_svg:ex.diagram_svg||null};
+  }
+
+  function exerciseRecord(block){
+    const lib=Array.isArray(window.osgbExerciseLibrary)?window.osgbExerciseLibrary:[];
+    return lib.find(ex=>String(ex.id)===String(block?.exercise_id))||lib.find(ex=>norm(ex.title)===norm(block?.title))||null;
+  }
+
+  function cleanDiagram(value){
+    if(!value)return'';
+    try{const doc=new DOMParser().parseFromString(String(value),'image/svg+xml'),svg=doc.documentElement;if(svg.nodeName.toLowerCase()!=='svg'||doc.querySelector('parsererror'))return'';svg.querySelectorAll('script,foreignObject,iframe,object,embed').forEach(n=>n.remove());svg.querySelectorAll('*').forEach(n=>[...n.attributes].forEach(a=>{if(/^on/i.test(a.name)||/^(?:javascript|data):/i.test(a.value))n.removeAttribute(a.name);}));svg.setAttribute('class','training-exercise-svg');svg.setAttribute('role','img');return new XMLSerializer().serializeToString(svg);}catch(_){return'';}
+  }
+
+  function fallbackDiagram(block){
+    const title=esc(block?.title||'Esercizio'),duel=/1\s*(?:contro|c)\s*1/i.test(block?.title||block?.category||''),match=/(partita|2\s*(?:contro|c)\s*2|3\s*(?:contro|c)\s*3)/i.test(block?.title||block?.category||'');
+    const players=duel?'<circle cx="205" cy="150" r="13" fill="#2877df"/><circle cx="315" cy="150" r="13" fill="#f4cf19"/>':match?'<circle cx="175" cy="105" r="11" fill="#2877df"/><circle cx="175" cy="195" r="11" fill="#2877df"/><circle cx="345" cy="105" r="11" fill="#f4cf19"/><circle cx="345" cy="195" r="11" fill="#f4cf19"/>':'<circle cx="140" cy="150" r="13" fill="#2877df"/><path d="M160 150 C230 95 285 205 360 150" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="12 9" marker-end="url(#ta)"/>';
+    return `<svg viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg" aria-label="Schema di ${title}"><defs><marker id="ta" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#fff"/></marker></defs><rect width="520" height="300" rx="22" fill="#176d42"/><rect x="32" y="38" width="456" height="224" rx="10" fill="none" stroke="#fff" stroke-width="4"/>${match?'<path d="M260 38V262" stroke="#fff" stroke-width="3" opacity=".75"/><circle cx="260" cy="150" r="42" fill="none" stroke="#fff" stroke-width="3" opacity=".75"/>':''}${players}<circle cx="260" cy="150" r="7" fill="#fff" stroke="#17396f" stroke-width="2"/><text x="260" y="285" text-anchor="middle" fill="#fff" font-family="Arial" font-size="17" font-weight="700">${title}</text></svg>`;
+  }
+
+  function exerciseDevelopment(block){
+    const saved=exerciseRecord(block),x={...saved,...block},diagram=cleanDiagram(x.diagram_svg)||fallbackDiagram(x);
+    return `<div class="training-exercise-development">${diagram}<div class="training-exercise-copy">${x.category?`<span class="pill">${esc(x.category)}</span>`:''}${x.objective?`<p><b>Obiettivo:</b> ${esc(x.objective)}</p>`:''}${x.description?`<p><b>Svolgimento:</b> ${esc(x.description)}</p>`:'<p class="muted">Svolgimento descritto dal titolo e dalle indicazioni della seduta.</p>'}${x.equipment?`<p><b>Materiale:</b> ${esc(x.equipment)}</p>`:''}${x.variants?`<p><b>Varianti:</b> ${esc(x.variants)}</p>`:''}</div></div>`;
   }
 
   function buildStructure(total,objective,players,coaches){
@@ -79,10 +100,10 @@
   function structureHtml(structure,sessionId){
     return structure.map((x,index)=>{
       if(x.source==='stations'){
-        const stations=(x.stations||[]).map((s,si)=>`<div class="card" style="margin-top:8px"><b>Stazione ${s.station} · ${s.group_size} bambini</b><p style="margin:6px 0">${esc(s.title)}</p>${s.space?`<small class="muted">${esc(s.space)}</small>`:''}${sessionId?`<div style="margin-top:7px"><button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},${si})'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div>`).join('');
+        const stations=(x.stations||[]).map((s,si)=>`<div class="card training-station" style="margin-top:8px"><b>Stazione ${s.station} · ${s.group_size} bambini</b><h4>${esc(s.title)}</h4>${s.space?`<small class="muted">Spazio: ${esc(s.space)}</small>`:''}${exerciseDevelopment(s)}${sessionId?`<div style="margin-top:7px"><button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},${si})'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div>`).join('');
         return `<div class="event"><div class="date">${x.duration_minutes} min</div><div class="body"><strong>${esc(x.title)}</strong><small>${x.groups?.join('–')||''} bambini · cambio ogni ${x.rotation_minutes||'—'} min</small>${stations}${editControls(sessionId,index)}</div></div>`;
       }
-      return `<div class="event"><div class="date">${esc(x.duration_minutes||'')} min</div><div class="body"><strong>${esc(x.title||'Esercizio')}</strong><small>${x.source==='library'?'Da archivio esercizi':x.source==='ai'?'Generato con AI':'Blocco standard'}${x.space?' · '+esc(x.space):''}</small>${sessionId?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">${editControls(sessionId,index)}<button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},null)'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div></div>`;
+      return `<div class="event training-exercise-row"><div class="date">${esc(x.duration_minutes||'')} min</div><div class="body"><strong>${esc(x.title||'Esercizio')}</strong><small>${x.source==='library'?'Da archivio esercizi':x.source==='ai'?'Generato automaticamente':'Blocco standard'}${x.space?' · '+esc(x.space):''}</small>${exerciseDevelopment(x)}${sessionId?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">${editControls(sessionId,index)}<button class="btn alt" style="padding:6px 9px" onclick='replaceTrainingExercise(${JSON.stringify(String(sessionId))},${index},null)'><i data-lucide="refresh-cw"></i>Sostituisci</button></div>`:''}</div></div>`;
     }).join('');
   }
 
