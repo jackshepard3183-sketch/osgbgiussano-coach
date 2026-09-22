@@ -3,6 +3,17 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   function lib(){return Array.isArray(window.osgbExerciseLibrary)?window.osgbExerciseLibrary:[];}
   const sourceLabel=value=>window.osgbExerciseImport.sourceLabel(value);
+  function diagramPreview(svgText){
+    if(!svgText)return'';
+    try{
+      const doc=new DOMParser().parseFromString(svgText,'image/svg+xml'),svg=doc.documentElement;
+      if(svg.nodeName.toLowerCase()!=='svg')return'';
+      svg.removeAttribute('id');svg.removeAttribute('onclick');svg.removeAttribute('style');
+      svg.setAttribute('class','saved-diagram');svg.setAttribute('role','img');svg.setAttribute('aria-label','Rappresentazione grafica di questo esercizio');
+      svg.querySelectorAll('script,foreignObject,[onclick]').forEach(node=>node.remove());
+      return new XMLSerializer().serializeToString(svg);
+    }catch(_){return'';}
+  }
   window.editExerciseAdmin=function(id){
     const x=lib().find(v=>String(v.id)===String(id));if(!x)return;
     closeM();
@@ -48,7 +59,8 @@
     ].map(([k,label,n])=>`<button class="btn ${filter===k?'':'alt'}" style="padding:7px 10px" onclick="exercises('${k}')">${label} · ${n}</button>`).join('');
     const list=visible.length?visible.map(x=>{
       const src=sourceLabel(x.source_type);
-      return `<div class="card exercise-library-card"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">${esc(x.category||'Esercizio')}</span><span class="pill yellow">${src}</span>${x.diagram_svg?'<span class="pill">Schema grafico</span>':''}</div><h3>${esc(x.title)}</h3><p class="muted">${x.duration_minutes?x.duration_minutes+' min · ':''}${esc(x.objective||'')}</p>${x.description?`<p>${esc(x.description)}</p>`:''}<div class="row exercise-card-actions"><button class="btn alt" onclick='openExerciseDetail(${JSON.stringify(String(x.id))})'><i data-lucide="eye"></i>Apri</button><button class="btn alt" onclick='editExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="pencil"></i>Modifica</button><button class="btn alt" onclick='deleteExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="trash-2"></i>Elimina</button></div></div>`;
+      const preview=diagramPreview(x.diagram_svg);
+      return `<div class="card exercise-library-card">${preview?`<button class="exercise-library-diagram" type="button" aria-label="Apri ${esc(x.title)}" onclick='openExerciseDetail(${JSON.stringify(String(x.id))})'>${preview}</button>`:`<div class="exercise-library-diagram exercise-library-diagram-empty"><i data-lucide="goal"></i><span>Rappresentazione grafica non disponibile</span></div>`}<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">${esc(x.category||'Esercizio')}</span><span class="pill yellow">${src}</span>${preview?'<span class="pill">Schema grafico</span>':''}</div><h3>${esc(x.title)}</h3><p class="muted">${x.duration_minutes?x.duration_minutes+' min · ':''}${esc(x.objective||'')}</p>${x.description?`<p>${esc(x.description)}</p>`:''}<div class="row exercise-card-actions"><button class="btn alt" onclick='openExerciseDetail(${JSON.stringify(String(x.id))})'><i data-lucide="eye"></i>Apri</button><button class="btn alt" onclick='editExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="pencil"></i>Modifica</button><button class="btn alt" onclick='deleteExerciseAdmin(${JSON.stringify(String(x.id))})'><i data-lucide="trash-2"></i>Elimina</button></div></div>`;
     }).join(''):`<div class="card" style="margin-top:10px"><p class="muted">${filter==='ai'?'Nessun esercizio ChatGPT ancora salvato.':filter==='local'?'Nessun esercizio generato localmente ancora salvato.':'Nessun esercizio in questa categoria.'}</p></div>`;
     closeM();
     modal(`<div class="exercise-library-head"><div class="mh"><h3>ARCHIVIO ESERCIZI</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div><div class="exercise-library-tools"><div class="field exercise-search"><label>Cerca esercizio</label><div class="exercise-search-box"><i data-lucide="search"></i><input id="exerciseLibrarySearch" value="${esc(window.__exerciseSearch||'')}" placeholder="Titolo, obiettivo, descrizione o materiale…" oninput="setExerciseSearch(this.value)"></div></div><div class="field"><label>Categoria</label><select onchange="setExerciseCategory(this.value)">${categoryOptions}</select></div></div><div class="exercise-import-actions"><button class="btn yellow" onclick="openAiExerciseGenerator()"><i data-lucide="sparkles"></i>Genera esercizio</button><button class="btn" onclick="newExercise()"><i data-lucide="plus"></i>Nuovo manuale</button><button class="btn alt" onclick="importExerciseImage()"><i data-lucide="image-plus"></i>Immagine</button><button class="btn alt" onclick="importExercisePdf()"><i data-lucide="file-text"></i>PDF</button><button class="btn alt" onclick="importExerciseInstagram()"><i data-lucide="instagram"></i>Instagram</button><button class="btn alt" onclick="importExerciseChatgpt()"><i data-lucide="message-square-text"></i>ChatGPT</button><button class="btn alt" onclick="importExerciseWeb()"><i data-lucide="globe-2"></i>Web</button></div><div class="exercise-source-tabs">${tabs}</div><p class="muted exercise-result-count">${visible.length} esercizi visualizzati su ${items.length}</p></div><div class="exercise-library-grid">${list}</div>`);

@@ -67,8 +67,24 @@ test('ChatGPT markdown conversation splits and saves multiple exercises',async()
   assert.match(document.body.innerHTML,/1 di 2/);
   await ctx.saveImportedExercise();await ctx.saveImportedExercise();
   assert.equal(state.rows.length,2);
-  assert.equal(state.rows[0].source_type,'web');
+  assert.equal(state.rows[0].source_type,'ai');
   assert.equal(state.rows[0].source_url,'https://chatgpt.com/share/example-123');
+});
+
+test('ChatGPT field labels in bold on separate lines are recognized',async()=>{
+  const {ctx}=await app();
+  const text='### NUOVO ESERCIZIO\n\n**Titolo**\nLe porticine colorate\n**Categoria**\nConduzione\n**Durata**\n10 minuti\n**Obiettivo**\nControllo della palla\n**Spazio**\n20x20 m\n**Materiale**\nPalloni e cinesini\n**Descrizione**\nGuidare la palla nella porta chiamata.\n**Varianti**\nUsare il piede debole.';
+  const chunks=ctx.osgbExerciseImport.splitExercises(text);
+  const d=ctx.osgbExerciseImport.parseText(chunks[0]);
+  assert.equal(d.title,'Le porticine colorate');assert.equal(d.category,'Conduzione');assert.equal(d.duration,'10');assert.equal(d.objective,'Controllo della palla');assert.equal(d.space,'20x20 m');assert.equal(d.equipment,'Palloni e cinesini');assert.equal(d.description,'Guidare la palla nella porta chiamata.');assert.equal(d.variants,'Usare il piede debole.');
+});
+
+test('archive cards display their saved diagram preview',async()=>{
+  const {ctx,state,document}=await app();
+  state.rows=[{id:'1',title:'Slalom',category:'Conduzione',source_type:'ai',diagram_svg:'<svg viewBox="0 0 500 300"><circle cx="50" cy="50" r="10"/></svg>'}];
+  await ctx.osgbReloadExercises();ctx.exercises();
+  assert.equal(document.querySelectorAll('.exercise-library-diagram .saved-diagram').length,1);
+  assert.match(document.querySelector('.exercise-library-diagram').getAttribute('aria-label'),/Slalom/);
 });
 
 test('readable Instagram link creates and saves a draft without an image',async()=>{

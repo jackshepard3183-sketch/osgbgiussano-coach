@@ -65,7 +65,7 @@
   function openPdfDraft(index){
     pdfDraftIndex=index;const item=pdfDrafts[index];if(!item)return;
     currentOcr=item.transcript;diagramItems=[];arrowStart=null;window.__diagramSvg=null;window.__exerciseDraft=null;
-    const total=pdfDrafts.length,sourceName=importSource==='web'?'conversazione':'PDF',notice=total>1?`Riconosciuti ${total} esercizi nella ${sourceName}. Stai controllando l’esercizio ${index+1} di ${total}.`:item.notice||'';
+    const total=pdfDrafts.length,sourceName=importSource==='ai'||importSource==='web'?'conversazione':'PDF',notice=total>1?`Riconosciuti ${total} esercizi nella ${sourceName}. Stai controllando l’esercizio ${index+1} di ${total}.`:item.notice||'';
     openExerciseImportDraft({...item.draft,transcript:item.transcript,notice});
   }
   window.preparePdfDraftManually=function(){if(checkPdfSource()){operation++;pdfDrafts=[{draft:parseText(currentOcr),transcript:currentOcr}];openPdfDraft(0);}};
@@ -98,7 +98,7 @@
       <p class="muted">Se Instagram non consente di leggere il link, usa gli screenshot oppure incolla la descrizione del post.</p>`);
   };
   window.importExerciseChatgpt=function(){
-    resetImport('web');closeM();
+    resetImport('ai');closeM();
     modal(`<div class="mh"><h3>IMPORTA DA CHATGPT</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div><p class="muted">Copia dalla conversazione la parte che contiene gli esercizi e incollala qui. L’app riconoscerà anche più esercizi nello stesso testo e te li farà controllare uno alla volta.</p><div class="field"><label for="chatgptSourceUrl">Link condiviso ChatGPT (facoltativo)</label><input id="chatgptSourceUrl" type="url" placeholder="https://chatgpt.com/share/..."><small class="muted">Il link viene conservato come fonte. Il testo va incollato sotto perché i link condivisi possono bloccare la lettura automatica.</small></div><div class="field"><label for="chatgptSourceText">Testo della conversazione</label><textarea id="chatgptSourceText" style="min-height:240px" placeholder="Incolla qui gli esercizi creati nella chat"></textarea></div><button class="btn" onclick="prepareChatgptExerciseDrafts()"><i data-lucide="sparkles"></i>Analizza e crea le bozze</button>`);
   };
   window.prepareChatgptExerciseDrafts=function(){
