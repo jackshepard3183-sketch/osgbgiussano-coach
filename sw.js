@@ -1,4 +1,4 @@
-const CACHE='osgb-coach-v71';
+const CACHE='osgb-coach-v72';
 const ASSETS=['./',
 './index.html',
 './styles.css',
@@ -10,6 +10,7 @@ const ASSETS=['./',
 './development-ui.js',
 './ui-fix.js',
 './attendance-sync.js',
+'./hub-sync-utils.js',
 './events-sync.js',
 './calendar-ui.js',
 './match-detail.js',
