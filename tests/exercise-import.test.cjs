@@ -90,6 +90,16 @@ test('numbered ChatGPT exercises with repeated NUOVO ESERCIZIO headers import se
   assert.equal(drafts[1].category,'Tecnica – conduzione');assert.equal(drafts[1].description,'Attraversare le porticine.');
 });
 
+test('numbered Markdown exercises with bold field headings import separately',async()=>{
+  const {ctx}=await app();
+  const text='## ESERCIZIO 1\n### NUOVO ESERCIZIO\n**Titolo**\nIl cacciatore\n**Categoria**\nAttivazione motoria\n**Durata**\n10 minuti\n**Obiettivo**\nRapidità e reazione.\n**Materiale**\nCinesini\n**Descrizione**\nUn bambino insegue gli altri.\n## ESERCIZIO 2\n### NUOVO ESERCIZIO\n**Titolo**\nPartita 2 contro 2 più jolly\n**Categoria**\nPartita\n**Durata**\n10 minuti\n**Obiettivo**\nCollaborazione.\n**Materiale**\nPalloni, Cinesini, Porticine\n**Descrizione**\nDue squadre giocano con un jolly.';
+  const chunks=ctx.osgbExerciseImport.splitExercises(text);
+  assert.equal(chunks.length,2);
+  const parsed=chunks.map(ctx.osgbExerciseImport.parseText);
+  assert.equal(parsed.map(x=>x.title).join('|'),'Il cacciatore|Partita 2 contro 2 più jolly');
+  assert.equal(parsed.map(x=>x.category).join('|'),'Attivazione motoria|Partita');
+});
+
 test('archive cards display their saved diagram preview',async()=>{
   const {ctx,state,document}=await app();
   state.rows=[{id:'1',title:'Slalom',category:'Conduzione',source_type:'ai',diagram_svg:'<svg viewBox="0 0 500 300"><circle cx="50" cy="50" r="10"/></svg>'}];
