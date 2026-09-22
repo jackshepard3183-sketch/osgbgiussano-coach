@@ -22,7 +22,7 @@
   window.choosePendingTrainingReplacement=function(i,exId){
     const ex=(window.osgbExerciseLibrary||[]).find(x=>String(x.id)===String(exId)),p=pending();if(!ex||!p)return;
     const old=p.structure[i]||{},duration=Number(old.duration_minutes)||Number(ex.duration_minutes)||10;
-    p.structure[i]={order:i+1,title:ex.title,duration_minutes:duration,exercise_id:ex.id,category:ex.category||null,objective:ex.objective||null,space:ex.space||null,equipment:ex.equipment||null,description:ex.description||null,variants:ex.variants||null,source:'library'};
+    p.structure[i]={order:i+1,title:ex.title,duration_minutes:duration,exercise_id:ex.id,category:ex.category||null,objective:ex.objective||null,space:ex.space||null,equipment:ex.equipment||null,description:ex.description||null,variants:ex.variants||null,diagram_svg:ex.diagram_svg||null,source:'library'};
     closeM();modal(editorHtml());
   };
   window.syncPendingTrainingDuration=function(){const p=pending();if(!p)return;p.duration_minutes=totalMinutes(p);closeM();modal(editorHtml());};
