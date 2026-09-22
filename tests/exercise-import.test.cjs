@@ -79,6 +79,17 @@ test('ChatGPT field labels in bold on separate lines are recognized',async()=>{
   assert.equal(d.title,'Le porticine colorate');assert.equal(d.category,'Conduzione');assert.equal(d.duration,'10');assert.equal(d.objective,'Controllo della palla');assert.equal(d.space,'20x20 m');assert.equal(d.equipment,'Palloni e cinesini');assert.equal(d.description,'Guidare la palla nella porta chiamata.');assert.equal(d.variants,'Usare il piede debole.');
 });
 
+test('numbered ChatGPT exercises with repeated NUOVO ESERCIZIO headers import separately',async()=>{
+  const {ctx}=await app();
+  const text='ESERCIZIO 1\nNUOVO ESERCIZIO\nTitolo\nIl cacciatore\nCategoria\nAttivazione motoria\nDurata\n8-10 minuti\nObiettivo\nRapidità e reazione.\nSpazio\n10x10 m.\nMateriale\nCinesini.\nDescrizione\nUn bambino insegue gli altri.\nVarianti\nDue cacciatori.\nTERZO ALLENAMENTO – PRIMA VERSIONE\nESERCIZIO 2\nNUOVO ESERCIZIO\nTitolo\nLe porticine\nCategoria\nTecnica – conduzione\nDurata\n6-8 minuti\nObiettivo\nControllo della palla.\nSpazio\n10x10 m.\nMateriale\nPalloni e cinesini.\nDescrizione\nAttraversare le porticine.\nVarianti\nChiamata del colore.';
+  const chunks=ctx.osgbExerciseImport.splitExercises(text);
+  assert.equal(chunks.length,2);
+  const drafts=chunks.map(ctx.osgbExerciseImport.parseText);
+  assert.equal(drafts.map(x=>x.title).join('|'),'Il cacciatore|Le porticine');
+  assert.equal(drafts[0].duration,'8');assert.equal(drafts[0].variants,'Due cacciatori.');
+  assert.equal(drafts[1].category,'Tecnica – conduzione');assert.equal(drafts[1].description,'Attraversare le porticine.');
+});
+
 test('archive cards display their saved diagram preview',async()=>{
   const {ctx,state,document}=await app();
   state.rows=[{id:'1',title:'Slalom',category:'Conduzione',source_type:'ai',diagram_svg:'<svg viewBox="0 0 500 300"><circle cx="50" cy="50" r="10"/></svg>'}];

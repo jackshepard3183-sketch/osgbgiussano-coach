@@ -18,7 +18,7 @@
     const cleanLine=value=>String(value||'').trim()
       .replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/,'')
       .replace(/^\*{1,2}(.+?)\*{1,2}$/,'$1').replace(/^_{1,2}(.+?)_{1,2}$/,'$1').trim();
-    const lines=String(text||'').split(/\r?\n/).map(cleanLine).filter(Boolean);
+    const lines=String(text||'').split(/\r?\n/).map(cleanLine).filter(line=>line&&!/^(?:PRIMO|SECONDO|TERZO|QUARTO|QUINTO|SESTO|SETTIMO|OTTAVO|NONO|DECIMO)?\s*ALLENAMENTO\b/i.test(line));
     const fields={};
     const names={'titolo':'title','descrizione':'description','svolgimento':'description','obiettivo':'objective','obiettivi':'objective','finalità':'objective','finalita':'objective','materiale':'equipment','attrezzatura':'equipment','note':'notes','varianti':'variants','spazio':'space','campo':'space','durata':'duration','tempo':'duration','categoria':'category'};
     const heading=/^(titolo|descrizione|svolgimento|obiettiv[oi]|finalit[aà]|materiale|attrezzatura|note|varianti|spazio|campo|durata|tempo|categoria)(?:\s*[:–-]\s*(.*))?$/i;
@@ -44,14 +44,14 @@
 
   function splitExercises(text,pageTexts=[]){
     const source=String(text||'').trim();if(!source)return [];
+    const byNumber=source.split(/(?=^\s*(?:#{1,6}\s*)?(?:\*{1,2})?(?:Esercizio|Esercitazione)\s*(?:n\.?\s*)?\d+\s*[:–-]?)/gim).map(x=>x.replace(/^\s*(?:#{1,6}\s*)?\*{1,2}/,'').replace(/\*{1,2}\s*$/m,'').trim()).filter(Boolean);
+    if(byNumber.length>1)return byNumber.filter(chunk=>/(?:titolo|descrizione|svolgimento|obiettiv[oi]|materiale)\s*(?::|–|-|\r?$)/im.test(chunk));
     const markdown='(?:#{1,6}\\s*)?(?:\\*{1,2}|_{1,2})?';
     const byNewExercise=source.split(new RegExp('(?=^\\s*'+markdown+'NUOVO\\s+ESERCIZIO(?:\\s*(?:\\*{1,2}|_{1,2}))?\\s*$)','gim')).map(x=>x.trim()).filter(Boolean);
     if(byNewExercise.length>1)return byNewExercise;
     const withoutIntro=source.replace(new RegExp('^\\s*'+markdown+'NUOVO\\s+ESERCIZIO(?:\\s*(?:\\*{1,2}|_{1,2}))?\\s*','i'),'');
     const byTitle=withoutIntro.split(new RegExp('(?=^\\s*'+markdown+'Titolo(?:\\s*(?:\\*{1,2}|_{1,2}))?\\s*(?::|–|-|$))','gim')).map(x=>x.trim()).filter(Boolean);
     if(byTitle.length>1)return byTitle;
-    const byNumber=source.split(/(?=^\s*(?:#{1,6}\s*)?(?:\*{1,2})?(?:Esercizio|Esercitazione)\s*(?:n\.?\s*)?\d+\s*[:–-]?)/gim).map(x=>x.replace(/^\s*(?:#{1,6}\s*)?\*{1,2}/,'').replace(/\*{1,2}\s*$/m,'').trim()).filter(Boolean);
-    if(byNumber.length>1)return byNumber;
     const pages=pageTexts.map(x=>String(x||'').trim()).filter(Boolean);
     const exercisePages=pages.filter(x=>/(?:titolo|esercizio|esercitazione|obiettiv[oi]|descrizione|svolgimento|materiale)\s*[:–-]?/i.test(x)&&x.length>=30);
     return exercisePages.length>1&&exercisePages.length===pages.length?pages:[source];
