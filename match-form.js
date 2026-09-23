@@ -3,9 +3,9 @@
     modal(`<div class="mh"><h3>NUOVA GARA</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
       <div class="field"><label>Squadra</label><select id="matchTeam"><option value="BLU">BLU</option><option value="GIALLA">GIALLA</option></select></div>
       <div class="field"><label>Tipo</label><select id="matchType"><option>Campionato</option><option>Amichevole</option><option>Torneo</option></select></div>
-      <div class="field"><label>Data</label><input id="matchDate" type="date"></div>
-      <div class="field"><label>Ora inizio</label><input id="matchTime" type="time"></div>
-      <div class="field"><label>Ritrovo</label><input id="matchMeet" type="time"></div>
+      <div class="field"><label>Data</label>${osgbNativePickerField('matchDate','date','')}</div>
+      <div class="field"><label>Ora inizio</label>${osgbNativePickerField('matchTime','time','')}</div>
+      <div class="field"><label>Ritrovo</label>${osgbNativePickerField('matchMeet','time','')}</div>
       <div class="field"><label>Avversario</label><input id="matchOpponent" placeholder="Nome società"></div>
       <div class="field"><label>Casa / trasferta</label><select id="matchHomeAway"><option value="home">Casa</option><option value="away">Trasferta</option></select></div>
       <div class="field"><label>Campo / impianto</label><input id="matchVenue"></div>
