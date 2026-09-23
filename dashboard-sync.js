@@ -15,7 +15,7 @@
     const sd=start.toISOString().slice(0,10),ed=end.toISOString().slice(0,10);
 
     const [{data:ev},{data:tr},{data:attEv},{data:players}]=await Promise.all([
-      client.from('events').select('id,event_date,start_time,meeting_time,title,event_type,team_color,venue,address').gte('event_date',t).order('event_date',{ascending:true}).order('start_time',{ascending:true}).limit(12),
+      client.from('events').select('id,event_date,start_time,meeting_time,title,event_type,team_color,venue,address').or('external_active.is.null,external_active.eq.true').gte('event_date',t).order('event_date',{ascending:true}).order('start_time',{ascending:true}).limit(12),
       client.from('training_sessions').select('session_date,duration_minutes,objective').gte('session_date',sd).lte('session_date',ed),
       client.from('events').select('id,event_date').eq('event_type','training').lte('event_date',t).order('event_date',{ascending:false}).limit(1),
       client.from('players').select('id,active,birth_year,source_missing,source_synced_at,source_last_seen_at').eq('birth_year',2020).eq('active',true)
@@ -46,7 +46,8 @@
 
   function matchCard(e){
     if(!e)return `<div class="card"><div class="muted">PROSSIMA GARA</div><h3>Nessuna gara inserita</h3><p class="muted">Aggiungila dal Calendario.</p></div>`;
-    return `<div class="card ${e.team_color==='GIALLA'?'yellow':''}"><span class="pill ${e.team_color==='GIALLA'?'yellow':''}">${esc(e.team_color||'GARA')}</span><h3>${esc(e.title)}</h3><p class="muted">${fmtDate(e.event_date)}${e.start_time?' · '+hh(e.start_time):''}${e.venue?' · '+esc(e.venue):''}</p><button class="btn alt" onclick='openMatch(${JSON.stringify(String(e.id))})'>Apri gara</button></div>`;
+    const colorClass=e.team_color==='BLU'?'blue':e.team_color==='GIALLA'?'yellow':'';
+    return `<div class="card ${colorClass}"><span class="pill ${e.team_color==='GIALLA'?'yellow':''}">${esc(e.team_color||'GARA')}</span><h3>${esc(e.title)}</h3><p class="muted">${fmtDate(e.event_date)}${e.start_time?' · '+hh(e.start_time):''}${e.venue?' · '+esc(e.venue):''}</p><button class="btn alt" onclick='openMatch(${JSON.stringify(String(e.id))})'>Apri gara</button></div>`;
   }
 
   function rosterCard(){
