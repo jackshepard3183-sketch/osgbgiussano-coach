@@ -36,15 +36,17 @@
         const sourceEvents=Array.isArray(payload?.events)?payload.events:[];
         const valid=sourceEvents.filter(OSGBHubSync.isValidEvent);
         const rows=valid.map(event=>OSGBHubSync.mapEvent(event,user.id));
-        const {data:existing,error:existingError}=await client.from('events').select('id,external_id,event_date,external_active').eq('external_source',OSGBHubSync.SOURCE);
+        const {data:existing,error:existingError}=await client.from('events').select('id,external_id,event_date,external_active,external_locked').eq('external_source',OSGBHubSync.SOURCE);
         if(existingError)throw existingError;
         const existingById=new Map((existing||[]).map(row=>[row.external_id,row]));
-        if(rows.length){
-          const {error}=await client.from('events').upsert(rows,{onConflict:'owner_user_id,external_source,external_id'});
+        const lockedIds=new Set((existing||[]).filter(row=>row.external_locked).map(row=>row.external_id));
+        const syncRows=rows.filter(row=>!lockedIds.has(row.external_id));
+        if(syncRows.length){
+          const {error}=await client.from('events').upsert(syncRows,{onConflict:'owner_user_id,external_source,external_id'});
           if(error)throw error;
         }
         const sourceIds=new Set(rows.map(row=>row.external_id));
-        const missing=(existing||[]).filter(row=>row.external_id&&!sourceIds.has(row.external_id)&&row.event_date>='2026-09-10');
+        const missing=(existing||[]).filter(row=>!row.external_locked&&row.external_id&&!sourceIds.has(row.external_id)&&row.event_date>='2026-09-10');
         if(missing.length){
           const {error}=await client.from('events').update({external_active:false,updated_at:new Date().toISOString()}).in('id',missing.map(row=>row.id));
           if(error)throw error;
@@ -52,8 +54,9 @@
         const created=rows.filter(row=>!existingById.has(row.external_id)).length;
         const active=rows.filter(row=>row.external_active).length;
         const hidden=rows.length-active+missing.length;
-        const message=`Sincronizzazione completata: ${active} amichevoli attive${created?`, ${created} nuove`:''}${hidden?`, ${hidden} annullate/rimosse`:''}.`;
-        notify({state:'success',message,created,active,hidden});
+        const preserved=lockedIds.size;
+        const message=`Sincronizzazione completata: ${active} amichevoli attive${created?`, ${created} nuove`:''}${preserved?`, ${preserved} modificate manualmente`:''}${hidden?`, ${hidden} annullate/rimosse`:''}.`;
+        notify({state:'success',message,created,active,hidden,preserved});
         await loadEvents();
         return {created,active,hidden};
       }catch(error){
