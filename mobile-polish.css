@@ -170,3 +170,28 @@ th,td{padding:6px 7px;vertical-align:top}
 input.native-picker-input[type="date"],input.native-picker-input[type="time"]{font-variant-numeric:tabular-nums}
 input.native-picker-input::-webkit-calendar-picker-indicator{opacity:.85;cursor:pointer;min-width:22px;min-height:22px}
 @media(max-width:480px){.native-picker-wrap{grid-template-columns:minmax(0,1fr) 42px}.native-picker-btn{width:42px;min-height:42px}.native-picker-wrap .native-picker-input{min-height:42px}}
+
+
+/* Picker OSGB in-app per data e ora: evita il dialog Android sovradimensionato. */
+.osgb-picker-display{width:100%;min-height:44px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);font:inherit;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;text-align:left}
+.osgb-picker-display span{font-variant-numeric:tabular-nums}
+.osgb-picker-display .icon{width:19px;height:19px;color:var(--primary)}
+.osgb-picker-overlay{position:fixed;inset:0;z-index:1400;background:rgba(7,20,46,.58);display:flex;align-items:center;justify-content:center;padding:16px}
+.osgb-picker-card{width:min(470px,100%);background:#fff;border-radius:20px;padding:16px;box-shadow:0 24px 70px rgba(7,20,46,.28)}
+.osgb-picker-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.osgb-picker-head>b{font-family:'Bebas Neue';font-size:24px;letter-spacing:.02em}
+.osgb-picker-grid{display:grid;gap:10px}
+.osgb-picker-grid.date{grid-template-columns:.8fr 1.4fr 1fr}
+.osgb-picker-grid.time{grid-template-columns:1fr 1fr}
+.osgb-picker-grid .field{margin:0}
+.osgb-picker-grid select{width:100%;min-height:46px;padding:10px;border:1px solid var(--border);border-radius:11px;background:#fff;color:var(--text);font:inherit}
+.osgb-time-preview{font-size:44px;font-weight:800;text-align:center;letter-spacing:.02em;color:var(--primary);padding:10px 0 16px;font-variant-numeric:tabular-nums}
+.osgb-picker-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media(max-width:480px){
+  .osgb-picker-overlay{align-items:flex-end;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+  .osgb-picker-card{border-radius:20px 20px 12px 12px;padding:14px}
+  .osgb-picker-grid.date{grid-template-columns:1fr}
+  .osgb-picker-grid.time{grid-template-columns:1fr 1fr}
+  .osgb-time-preview{font-size:38px}
+  .osgb-picker-actions .btn{flex:1}
+}
