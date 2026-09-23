@@ -53,22 +53,28 @@
   }
   async function updateFromHub(id,row){
     const payload={
+      event_date:row.event_date,
       event_type:'friendly',
       title:row.title,
-      event_date:row.event_date,
-      start_time:row.start_time,
+      start_time:row.start_time||'',
+      meeting_time:'',
       team_color:row.team_color,
       opponent:row.opponent,
       home_away:row.home_away,
-      venue:row.venue,
-      address:row.address,
-      notes:row.notes,
-      external_updated_at:row.external_updated_at,
-      external_active:row.external_active,
-      updated_at:new Date().toISOString()
+      venue:row.venue||'',
+      address:row.address||'',
+      notes:row.notes||''
     };
-    const {error}=await client.from('events').update(payload).eq('id',id);
+    const {error}=await client.rpc('coach_update_event',{p_event_id:id,p_data:payload});
     if(error)throw error;
+    // I metadati della fonte non devono impedire l'aggiornamento visibile della gara.
+    try{
+      await client.from('events').update({
+        external_updated_at:row.external_updated_at,
+        external_active:row.external_active,
+        updated_at:new Date().toISOString()
+      }).eq('id',id);
+    }catch(_){}
   }
   window.syncCampiFriendlies=function(options={}){
     if(syncPromise)return syncPromise;
