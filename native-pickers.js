@@ -48,7 +48,7 @@
   window.osgbOpenNativePicker=function(id){
     const input=document.getElementById(id);if(!input)return;
     closePicker();
-    const type=document.querySelector('.osgb-picker-wrap:has(#'+CSS.escape(id)+')')?.dataset.pickerType || (id.toLowerCase().includes('date')?'date':'time');
+    const type=id.toLowerCase().includes('date')?'date':'time';
     const overlay=document.createElement('div');overlay.id='osgbPickerOverlay';overlay.className='osgb-picker-overlay';overlay.dataset.target=id;
     overlay.innerHTML=type==='date'?datePicker(input):timePicker(input);
     overlay.addEventListener('click',e=>{if(e.target===overlay)closePicker();});
