@@ -24,6 +24,52 @@
     return data;
   };
   function notify(detail){window.dispatchEvent(new CustomEvent('osgb-hub-sync-status',{detail}));}
+  const SOURCE_FIELDS=[
+    ['event_date','Data',v=>String(v||'')],
+    ['start_time','Ora',v=>hh(v)],
+    ['team_color','Squadra',v=>String(v||'')],
+    ['opponent','Avversario',v=>String(v||'')],
+    ['home_away','Casa/trasferta',v=>v==='away'?'Trasferta':v==='home'?'Casa':''],
+    ['venue','Campo',v=>String(v||'')],
+    ['address','Indirizzo',v=>String(v||'')],
+    ['external_active','Stato',v=>v===false?'Annullata':'Attiva']
+  ];
+  function eventDiffs(current,incoming){
+    return SOURCE_FIELDS.flatMap(([field,label,normalize])=>{
+      const before=normalize(current?.[field]);
+      const after=normalize(incoming?.[field]);
+      return before===after?[]:[{field,label,before:before||'—',after:after||'—'}];
+    });
+  }
+  function changePrompt(current,incoming,diffs){
+    const title=incoming.title||current.title||incoming.opponent||'Amichevole';
+    const lines=diffs.map(d=>`• ${d.label}: ${d.before} → ${d.after}`).join('\n');
+    return `Campi e Spogliatoi contiene dati diversi per:\n\n${title}\n\n${lines}\n\nVuoi aggiornare questa partita nell'app OSGB Coach?`;
+  }
+  function missingPrompt(current){
+    const title=current.title||current.opponent||'Amichevole';
+    const date=current.event_date?new Date(current.event_date+'T12:00:00').toLocaleDateString('it-IT'):'';
+    return `Questa partita non risulta più tra le amichevoli di Campi e Spogliatoi:\n\n${title}${date?' · '+date:''}\n\nVuoi rimuoverla dal calendario OSGB Coach?`;
+  }
+  async function updateFromHub(id,row){
+    const payload={
+      event_type:'friendly',
+      title:row.title,
+      event_date:row.event_date,
+      start_time:row.start_time,
+      team_color:row.team_color,
+      opponent:row.opponent,
+      home_away:row.home_away,
+      venue:row.venue,
+      address:row.address,
+      notes:row.notes,
+      external_updated_at:row.external_updated_at,
+      external_active:row.external_active,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await client.from('events').update(payload).eq('id',id);
+    if(error)throw error;
+  }
   window.syncCampiFriendlies=function(options={}){
     if(syncPromise)return syncPromise;
     syncPromise=(async()=>{
@@ -36,29 +82,65 @@
         const sourceEvents=Array.isArray(payload?.events)?payload.events:[];
         const valid=sourceEvents.filter(OSGBHubSync.isValidEvent);
         const rows=valid.map(event=>OSGBHubSync.mapEvent(event,user.id));
-        const {data:existing,error:existingError}=await client.from('events').select('id,external_id,event_date,external_active,external_locked').eq('external_source',OSGBHubSync.SOURCE);
+        const {data:existing,error:existingError}=await client.from('events')
+          .select('id,title,external_id,event_date,start_time,team_color,opponent,home_away,venue,address,notes,external_active,external_locked')
+          .eq('external_source',OSGBHubSync.SOURCE);
         if(existingError)throw existingError;
+
         const existingById=new Map((existing||[]).map(row=>[row.external_id,row]));
-        const lockedIds=new Set((existing||[]).filter(row=>row.external_locked).map(row=>row.external_id));
-        const syncRows=rows.filter(row=>!lockedIds.has(row.external_id));
-        if(syncRows.length){
-          const {error}=await client.from('events').upsert(syncRows,{onConflict:'owner_user_id,external_source,external_id'});
-          if(error)throw error;
-        }
         const sourceIds=new Set(rows.map(row=>row.external_id));
-        const missing=(existing||[]).filter(row=>!row.external_locked&&row.external_id&&!sourceIds.has(row.external_id)&&row.event_date>='2026-09-10');
-        if(missing.length){
-          const {error}=await client.from('events').update({external_active:false,updated_at:new Date().toISOString()}).in('id',missing.map(row=>row.id));
+        let created=0,updated=0,skipped=0,removed=0,pending=0;
+
+        const newRows=rows.filter(row=>!existingById.has(row.external_id));
+        if(newRows.length){
+          const {error}=await client.from('events').upsert(newRows,{onConflict:'owner_user_id,external_source,external_id'});
           if(error)throw error;
+          created=newRows.length;
         }
-        const created=rows.filter(row=>!existingById.has(row.external_id)).length;
+
+        for(const row of rows){
+          const current=existingById.get(row.external_id);
+          if(!current)continue;
+          const diffs=eventDiffs(current,row);
+          if(!diffs.length)continue;
+          if(options.silent){
+            pending++;
+            continue;
+          }
+          if(window.confirm(changePrompt(current,row,diffs))){
+            await updateFromHub(current.id,row);
+            updated++;
+          }else{
+            skipped++;
+          }
+        }
+
+        const missing=(existing||[]).filter(row=>row.external_id&&!sourceIds.has(row.external_id)&&row.event_date>='2026-09-10'&&row.external_active!==false);
+        for(const current of missing){
+          if(options.silent){
+            pending++;
+            continue;
+          }
+          if(window.confirm(missingPrompt(current))){
+            const {error}=await client.from('events').update({external_active:false,updated_at:new Date().toISOString()}).eq('id',current.id);
+            if(error)throw error;
+            removed++;
+          }else{
+            skipped++;
+          }
+        }
+
         const active=rows.filter(row=>row.external_active).length;
-        const hidden=rows.length-active+missing.length;
-        const preserved=lockedIds.size;
-        const message=`Sincronizzazione completata: ${active} amichevoli attive${created?`, ${created} nuove`:''}${preserved?`, ${preserved} modificate manualmente`:''}${hidden?`, ${hidden} annullate/rimosse`:''}.`;
-        notify({state:'success',message,created,active,hidden,preserved});
+        const parts=[`Sincronizzazione completata: ${active} amichevoli dal gestionale`];
+        if(created)parts.push(`${created} nuove`);
+        if(updated)parts.push(`${updated} aggiornate`);
+        if(removed)parts.push(`${removed} rimosse`);
+        if(skipped)parts.push(`${skipped} modifiche non applicate`);
+        if(pending)parts.push(`${pending} modifiche da confermare manualmente`);
+        const message=parts.join(', ')+'.';
+        notify({state:'success',message,created,updated,removed,skipped,pending,active});
         await loadEvents();
-        return {created,active,hidden};
+        return {created,updated,removed,skipped,pending,active};
       }catch(error){
         console.error(error);
         notify({state:'error',message:error?.message||'Sincronizzazione non riuscita.'});
