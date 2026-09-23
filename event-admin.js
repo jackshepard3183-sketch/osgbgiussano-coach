@@ -9,9 +9,9 @@
     modal(`<div class="mh"><h3>MODIFICA GARA</h3><button class="close" onclick="closeM()"><i data-lucide="x"></i></button></div>
       <div class="field"><label>Squadra</label><select id="emTeam"><option ${e.team==='BLU'?'selected':''}>BLU</option><option ${e.team==='GIALLA'?'selected':''}>GIALLA</option></select></div>
       <div class="field"><label>Tipo</label><select id="emType"><option ${e.type==='Campionato'?'selected':''}>Campionato</option><option ${e.type==='Amichevole'?'selected':''}>Amichevole</option><option ${e.type==='Torneo'?'selected':''}>Torneo</option></select></div>
-      <div class="field"><label>Data</label><input id="emDate" type="date" value="${esc(e.date||'')}"></div>
-      <div class="field"><label>Ora</label><input id="emTime" type="time" value="${esc(e.time||'')}"></div>
-      <div class="field"><label>Ritrovo</label><input id="emMeet" type="time" value="${esc(e.meet||'')}"></div>
+      <div class="field"><label>Data</label>${osgbNativePickerField('emDate','date',e.date||'')}</div>
+      <div class="field"><label>Ora</label>${osgbNativePickerField('emTime','time',e.time||'')}</div>
+      <div class="field"><label>Ritrovo</label>${osgbNativePickerField('emMeet','time',e.meet||'')}</div>
       <div class="field"><label>Avversario</label><input id="emOpp" value="${esc(e.opponent||'')}"></div>
       <div class="field"><label>Casa / trasferta</label><select id="emHA"><option value="home" ${e.homeAway==='home'?'selected':''}>Casa</option><option value="away" ${e.homeAway==='away'?'selected':''}>Trasferta</option></select></div>
       <div class="field"><label>Campo</label><input id="emVenue" value="${esc(e.place||'')}"></div>
