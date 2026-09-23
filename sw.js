@@ -1,4 +1,4 @@
-const CACHE='osgb-coach-v74';
+const CACHE='osgb-coach-v75';
 const ASSETS=['./',
 './index.html',
 './styles.css',
@@ -28,6 +28,7 @@ const ASSETS=['./',
 './whatsapp-templates.js',
 './whatsapp-ui.js',
 './field-flow-polish.js',
+'./native-pickers.js',
 './match-form.js',
 './training-pdf-utils.js',
 './training-sync.js',
