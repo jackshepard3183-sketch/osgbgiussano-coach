@@ -5,8 +5,24 @@
   function teamPlayers(team){const map=S.asg[S.match]||{};return P.filter(p=>map[p.id]===team);}
   function fallback(team){
     const e=selectedEvent();if(!e)return 'Nessuna gara selezionata.';
-    const players=teamPlayers(team),names=players.map(p=>p.n),place=[e.place,e.addr].filter(Boolean).join(' – ')||'-';
-    return `${team==='BLU'?'🔵':'🟡'} *SQUADRA ${team} – OSGB GIUSSANO 2020*\n\n📅 ${fmtDate(e.date)}\n⚽ ${e.t||'Gara'}\n📍 ${place}\n🕒 Ritrovo: ${e.meet?'ore '+e.meet:'da definire'}\n🕞 Inizio: ${e.time?'ore '+e.time:'da definire'}\n\n👥 *Convocati (${names.length})*\n${names.length?names.map(n=>'• '+n).join('\n'):'• Da definire'}\n\nPer eventuali assenze o problemi, avvisare appena possibile.\n\nStaff OSGB Giussano 2020`;
+    const players=teamPlayers(team),names=players.map(p=>p.n);
+    const location=e.addr||e.place||'-';
+    const opponent=e.opponent||e.t||'Gara';
+    return `${team==='BLU'?'🔵':'🟡'} *SQUADRA ${team}*
+
+📅 ${fmtDate(e.date)}
+⚽ vs ${opponent}
+📍 ${location}
+🕒 Ritrovo: ${e.meet?'ore '+e.meet:'da definire'}
+🕞 Inizio: ${e.time?'ore '+e.time:'da definire'}
+
+👥 *Convocati (${names.length})*
+${names.length?names.map(n=>'• '+n).join('\\n'):'• Da definire'}
+
+✅ Per giocare useremo il *kit di allenamento* (maglietta blu + pantaloncini bianchi + calzettoni blu + parastinchi)
+
+Confermate la presenza.
+Grazie mille. 💙💛💪🏻⚽`;
   }
   function renderTemplate(body,team){
     const e=selectedEvent();if(!e)return '';
