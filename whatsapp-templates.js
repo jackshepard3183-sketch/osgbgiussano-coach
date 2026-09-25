@@ -1,13 +1,45 @@
 (function(){
   let client=null,user=null,templates=[];
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const fields=['{SQUADRA}','{DATA}','{AVVERSARIO}','{LUOGO}','{INDIRIZZO}','{RITROVO}','{INIZIO}','{CONVOCATI}','{NUM_CONVOCATI}'];
+  const fields=['{SQUADRA_EMOJI}','{SQUADRA}','{DATA}','{AVVERSARIO}','{LUOGO}','{INDIRIZZO}','{RITROVO}','{INIZIO}','{CONVOCATI}','{NUM_CONVOCATI}'];
+  const STANDARD_TEMPLATE_NAME='Testo standard OSGB';
+  const STANDARD_TEMPLATE_BODY=`{SQUADRA_EMOJI} *SQUADRA {SQUADRA}*
+
+📅 {DATA}
+⚽ vs {AVVERSARIO}
+📍 {INDIRIZZO}
+🕒 Ritrovo: {RITROVO}
+🕞 Inizio: {INIZIO}
+
+👥 *Convocati ({NUM_CONVOCATI})*
+{CONVOCATI}
+
+✅ Per giocare useremo il *kit di allenamento* (maglietta blu + pantaloncini bianchi + calzettoni blu + parastinchi)
+
+Confermate la presenza.
+Grazie mille. 💙💛💪🏻⚽`;
+
 
   async function loadTemplates(){
-    if(!client)return;
-    const {data,error}=await client.from('whatsapp_templates').select('id,name,body,is_default,created_at,updated_at').order('is_default',{ascending:false}).order('name',{ascending:true});
+    if(!client||!user)return;
+    let {data,error}=await client.from('whatsapp_templates').select('id,name,body,is_default,created_at,updated_at').order('is_default',{ascending:false}).order('name',{ascending:true});
     if(error){console.error('whatsapp templates load',error);return;}
     templates=data||[];
+    if(!templates.some(t=>t.name===STANDARD_TEMPLATE_NAME)){
+      const makeDefault=!templates.some(t=>t.is_default);
+      const {error:insertError}=await client.from('whatsapp_templates').insert({
+        owner_user_id:user.id,
+        name:STANDARD_TEMPLATE_NAME,
+        body:STANDARD_TEMPLATE_BODY,
+        is_default:makeDefault
+      });
+      if(insertError){
+        console.error('whatsapp standard template create',insertError);
+      }else{
+        const res=await client.from('whatsapp_templates').select('id,name,body,is_default,created_at,updated_at').order('is_default',{ascending:false}).order('name',{ascending:true});
+        if(!res.error)templates=res.data||[];
+      }
+    }
     window.osgbWhatsAppTemplates=templates.map(x=>({...x}));
   }
 
