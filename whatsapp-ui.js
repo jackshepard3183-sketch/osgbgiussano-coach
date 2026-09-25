@@ -28,6 +28,7 @@ Grazie mille. 💙💛💪🏻⚽`;
     const e=selectedEvent();if(!e)return '';
     const players=teamPlayers(team),names=players.map(p=>'• '+p.n).join('\n')||'• Da definire';
     const map={
+      '{SQUADRA_EMOJI}':team==='BLU'?'🔵':'🟡',
       '{SQUADRA}':team,
       '{DATA}':fmtDate(e.date),
       '{AVVERSARIO}':e.opponent||e.t||'Gara',
@@ -59,7 +60,7 @@ Grazie mille. 💙💛💪🏻⚽`;
   function templateSelector(){
     const list=typeof window.osgbGetWhatsAppTemplates==='function'?window.osgbGetWhatsAppTemplates():[];
     const def=typeof window.osgbGetDefaultWhatsAppTemplate==='function'?window.osgbGetDefaultWhatsAppTemplate():null;
-    return `<div class="card"><div class="field"><label>Modello messaggio</label><select id="waTemplate" onchange="refreshWhatsAppMessages()"><option value="">Testo standard OSGB</option>${list.map(t=>`<option value="${t.id}" ${def&&String(def.id)===String(t.id)?'selected':''}>${esc(t.name)}${t.is_default?' · predefinito':''}</option>`).join('')}</select></div><button class="btn alt" onclick="closeM();openWhatsAppTemplates()"><i data-lucide="library"></i>Gestisci modelli</button></div>`;
+    return `<div class="card"><div class="field"><label>Modello messaggio</label><select id="waTemplate" onchange="refreshWhatsAppMessages()">${list.length?list.map(t=>`<option value="${t.id}" ${def&&String(def.id)===String(t.id)?'selected':''}>${esc(t.name)}${t.is_default?' · predefinito':''}</option>`).join(''):'<option value="">Testo standard OSGB</option>'}</select></div><button class="btn alt" onclick="closeM();openWhatsAppTemplates()"><i data-lucide="library"></i>Gestisci modelli</button></div>`;
   }
   window.refreshWhatsAppMessages=function(){const b=document.getElementById('mb'),y=document.getElementById('my');if(b)b.value=build('BLU');if(y)y.value=build('GIALLA');};
   window.messages=function(){
