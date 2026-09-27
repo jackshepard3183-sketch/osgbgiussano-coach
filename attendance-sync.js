@@ -1,6 +1,6 @@
 (function(){
   const SEASON_START='2026-09-10';
-  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[],matchTeams={};
+  let client=null,user=null,eventId=null,selectedMatchId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[],matchTeams={},dayMatches=[];
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
@@ -47,7 +47,7 @@
 
   async function loadHistory(){
     if(!client||!user)return;
-    const {data,error}=await client.from('events').select('id,event_date,title,event_type,start_time,attendance(status)').eq('owner_user_id',user.id).gte('event_date',SEASON_START).lte('event_date',isoLocal(new Date())).order('event_date',{ascending:false}).limit(80);
+    const {data,error}=await client.from('events').select('id,event_date,title,event_type,start_time,team_color,opponent,attendance(status)').eq('owner_user_id',user.id).gte('event_date',SEASON_START).lte('event_date',isoLocal(new Date())).order('event_date',{ascending:false}).limit(80);
     if(error){console.warn('attendance history',error);return;}
     history=(data||[]).filter(e=>e.event_type==='training'||isMatchDay(e.event_date)).map(e=>{
       const rows=e.attendance||[],counts={present:0,absent:0,late:0,unavailable:0};rows.forEach(r=>{if(counts[r.status]!==undefined)counts[r.status]++;});
@@ -55,12 +55,17 @@
     });
   }
 
-  async function findEvent(date,mode=attendanceMode){
-    let query=client.from('events').select('id,event_type,title,start_time').eq('owner_user_id',user.id).eq('event_date',date);
+  async function findEvents(date,mode=attendanceMode){
+    let query=client.from('events').select('id,event_type,title,start_time,team_color,opponent').eq('owner_user_id',user.id).eq('event_date',date);
     query=mode==='training'?query.eq('event_type','training'):query.neq('event_type','training');
-    const {data,error}=await query.order('created_at',{ascending:true}).limit(1);
+    const {data,error}=await query.order('start_time',{ascending:true}).order('created_at',{ascending:true});
     if(error)throw error;
-    return data?.[0]||null;
+    return data||[];
+  }
+
+  async function findEvent(date,mode=attendanceMode){
+    const events=await findEvents(date,mode);
+    return events[0]||null;
   }
 
   async function ensureEvent(date){
@@ -76,8 +81,11 @@
 
   async function loadAttendance(date){
     currentDate=date||currentDate;
-    const event=await findEvent(currentDate,attendanceMode);
+    const events=await findEvents(currentDate,attendanceMode);
+    dayMatches=attendanceMode==='match'?events:[];
+    const event=attendanceMode==='match'?(events.find(e=>String(e.id)===String(selectedMatchId))||events[0]):events[0];
     eventId=event?.id||null;
+    if(attendanceMode==='match')selectedMatchId=eventId;
     S.pres={};
     matchTeams={};
     if(eventId){
@@ -110,12 +118,19 @@
   window.setAttendanceDate=async function(v){
     if(!v)return;
     v=nearestAllowedDate(v,attendanceMode,0);
+    selectedMatchId=null;
     try{ready=false;currentDate=v;render();await loadAttendance(v);}catch(e){alert('Errore nel caricamento delle presenze.');}
+  };
+
+  window.setAttendanceMatch=async function(id){
+    if(!id||id===String(eventId))return;
+    selectedMatchId=id;ready=false;render();
+    try{await loadAttendance(currentDate);}catch(e){alert('Errore nel caricamento della partita selezionata.');}
   };
 
   window.setAttendanceMode=async function(mode){
     if(mode!=='training'&&mode!=='match')return;
-    attendanceMode=mode;currentDate=nearestAllowedDate(isoLocal(new Date()),mode,0);ready=false;render();
+    attendanceMode=mode;selectedMatchId=null;currentDate=nearestAllowedDate(isoLocal(new Date()),mode,0);ready=false;render();
     try{await loadAttendance(currentDate);}catch(e){alert('Errore nel caricamento delle presenze.');}
   };
 
@@ -123,9 +138,9 @@
     setAttendanceDate(nearestAllowedDate(currentDate,attendanceMode,direction<0?-1:1));
   };
 
-  window.openAttendanceHistory=async function(date,type){
+  window.openAttendanceHistory=async function(date,type,id){
     if(date<SEASON_START)return;
-    attendanceMode=type==='training'?'training':'match';currentDate=date;ready=false;render();
+    attendanceMode=type==='training'?'training':'match';selectedMatchId=attendanceMode==='match'?id:null;currentDate=date;ready=false;render();
     try{await loadAttendance(date);}catch(e){alert('Errore nel caricamento del dettaglio presenze.');}
   };
 
@@ -147,6 +162,8 @@
     const total=called.length;
     const dates=relevantDates(attendanceMode),kind=attendanceMode==='training'?'Allenamento':'Partita';
     const options=dates.map(d=>`<option value="${d}" ${d===currentDate?'selected':''}>${esc(dayLabel(d))}</option>`).join('');
+    const matchOptions=dayMatches.map(e=>{const color=e.team_color&&e.team_color!=='ALL'?e.team_color+' · ':'';const time=e.start_time?` · ${String(e.start_time).slice(0,5)}`:'';return `<option value="${esc(e.id)}" ${String(e.id)===String(eventId)?'selected':''}>${esc(color+(e.title||e.opponent||'Partita')+time)}</option>`}).join('');
+    const matchPicker=attendanceMode==='match'&&dayMatches.length>1?`<div class="field attendance-match-field"><label>Partita / squadra</label><select onchange="setAttendanceMatch(this.value)">${matchOptions}</select></div>`:'';
     const message=attendanceMode==='match'&&!eventId?'Nessuna partita programmata in questa data: inseriscila prima nel Calendario.':eventId?'Salvataggio automatico su Supabase.':'Nessuna presenza ancora registrata per questa data.';
     const playerRow=(p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`;
     const teamBlock=(team,label,klass)=>{
@@ -156,8 +173,8 @@
     };
     const players=attendanceMode==='match'?`${teamBlock('BLU','GRUPPO BLU','blue-team')}${teamBlock('GIALLA','GRUPPO GIALLO','yellow-team')}`:P.map(playerRow).join('');
     const missingGroups=attendanceMode==='match'&&eventId&&!total?'<div class="card yellow"><b>Gruppi non ancora composti</b><p class="muted">Apri BLU / GIALLA e assegna i convocati alla partita. Le presenze saranno poi mostrate nei due gruppi.</p><button class="btn" onclick="go(\'builder\')"><i data-lucide="users-round"></i>Componi i gruppi</button></div>':'';
-    const historyList=history.length?history.map(h=>`<button class="attendance-history-item" onclick='openAttendanceHistory(${JSON.stringify(h.event_date)},${JSON.stringify(h.event_type)})'><span class="attendance-history-icon ${h.event_type==='training'?'training':'match'}"><i data-lucide="${h.event_type==='training'?'dumbbell':'trophy'}"></i></span><span class="attendance-history-main"><b>${esc(h.title||(h.event_type==='training'?'Allenamento':'Partita'))}</b><small>${esc(dayLabel(h.event_date))}</small></span><span class="attendance-history-recap"><b>${h.counts.present+h.counts.late}/${h.total||P.length}</b><small>presenti</small></span><i data-lucide="chevron-right"></i></button>`).join(''):'<p class="muted">Nessuna attività svolta ancora disponibile.</p>';
-    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div><div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&(!eventId||!total)?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div>${missingGroups}<div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">${attendanceMode==='match'?'GRUPPI PARTITA':'GIOCATORI'} · ${total}</div>${players}<div class="section">ATTIVITÀ SVOLTE</div><div class="card attendance-history">${historyList}</div>`;
+    const historyList=history.length?history.map(h=>`<button class="attendance-history-item" onclick='openAttendanceHistory(${JSON.stringify(h.event_date)},${JSON.stringify(h.event_type)},${JSON.stringify(h.id)})'><span class="attendance-history-icon ${h.event_type==='training'?'training':'match'}"><i data-lucide="${h.event_type==='training'?'dumbbell':'trophy'}"></i></span><span class="attendance-history-main"><b>${esc(h.title||(h.event_type==='training'?'Allenamento':'Partita'))}</b><small>${esc(dayLabel(h.event_date))}${h.team_color&&h.team_color!=='ALL'?' · '+esc(h.team_color):''}</small></span><span class="attendance-history-recap"><b>${h.counts.present+h.counts.late}/${h.total||P.length}</b><small>presenti</small></span><i data-lucide="chevron-right"></i></button>`).join(''):'<p class="muted">Nessuna attività svolta ancora disponibile.</p>';
+    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div>${matchPicker}<div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&(!eventId||!total)?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div>${missingGroups}<div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">${attendanceMode==='match'?'GRUPPI PARTITA':'GIOCATORI'} · ${total}</div>${players}<div class="section">ATTIVITÀ SVOLTE</div><div class="card attendance-history">${historyList}</div>`;
   };
 
   window.addEventListener('osgb-auth-ready',async e=>{
