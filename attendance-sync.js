@@ -1,6 +1,6 @@
 (function(){
   const SEASON_START='2026-09-10';
-  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[];
+  let client=null,user=null,eventId=null,currentDate=defaultTrainingDate(),ready=false,attendanceMode='training',history=[],matchTeams={};
   const waitRoster=()=>new Promise(resolve=>{let n=0;const t=setInterval(()=>{n++;if(P.length&&typeof P[0]?.id==='string'&&P[0].id.includes('-')){clearInterval(t);resolve()}else if(n>50){clearInterval(t);resolve()}},100)});
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=d=>{const [y,m,day]=d.split('-');return `${day}/${m}/${y}`};
@@ -79,10 +79,19 @@
     const event=await findEvent(currentDate,attendanceMode);
     eventId=event?.id||null;
     S.pres={};
+    matchTeams={};
     if(eventId){
-      const {data,error}=await client.from('attendance').select('player_id,status').eq('event_id',eventId);
-      if(error)throw error;
-      (data||[]).forEach(r=>S.pres[r.player_id]=TO_UI[r.status]||r.status);
+      const attendanceRequest=client.from('attendance').select('player_id,status').eq('event_id',eventId);
+      const requests=attendanceMode==='match'
+        ?[attendanceRequest,client.from('callups').select('player_id,team_color').eq('event_id',eventId)]
+        :[attendanceRequest];
+      const results=await Promise.all(requests);
+      if(results[0].error)throw results[0].error;
+      (results[0].data||[]).forEach(r=>S.pres[r.player_id]=TO_UI[r.status]||r.status);
+      if(results[1]){
+        if(results[1].error)throw results[1].error;
+        (results[1].data||[]).forEach(r=>matchTeams[r.player_id]=r.team_color);
+      }
     }
     ready=true;
     if(S.r==='pres')render();
@@ -124,21 +133,31 @@
     if(!client||!user)return;
     if(!eventId&&attendanceMode==='match'){alert('Prima inserisci la partita nel Calendario.');return;}
     if(!eventId)eventId=await ensureEvent(currentDate);
-    const rows=P.map(p=>({owner_user_id:user.id,event_id:eventId,player_id:p.id,status:'present',updated_at:new Date().toISOString()}));
+    const selected=attendanceMode==='match'?P.filter(p=>matchTeams[p.id]==='BLU'||matchTeams[p.id]==='GIALLA'):P;
+    if(attendanceMode==='match'&&!selected.length){alert('Prima componi i gruppi BLU e GIALLA per questa partita.');return;}
+    const rows=selected.map(p=>({owner_user_id:user.id,event_id:eventId,player_id:p.id,status:'present',updated_at:new Date().toISOString()}));
     const {error}=await client.from('attendance').upsert(rows,{onConflict:'event_id,player_id'});
     if(error){alert('Impossibile salvare le presenze.');return}
     rows.forEach(r=>S.pres[r.player_id]='p');render();await refreshDerived();
   };
 
   window.pres=function(){
-    let c={p:0,a:0,l:0,u:0};Object.values(S.pres||{}).forEach(x=>{if(c[x]!==undefined)c[x]++});
-    const total=P.length;
+    const called=attendanceMode==='match'?P.filter(p=>matchTeams[p.id]==='BLU'||matchTeams[p.id]==='GIALLA'):P;
+    let c={p:0,a:0,l:0,u:0};called.forEach(p=>{const x=S.pres[p.id];if(c[x]!==undefined)c[x]++});
+    const total=called.length;
     const dates=relevantDates(attendanceMode),kind=attendanceMode==='training'?'Allenamento':'Partita';
     const options=dates.map(d=>`<option value="${d}" ${d===currentDate?'selected':''}>${esc(dayLabel(d))}</option>`).join('');
     const message=attendanceMode==='match'&&!eventId?'Nessuna partita programmata in questa data: inseriscila prima nel Calendario.':eventId?'Salvataggio automatico su Supabase.':'Nessuna presenza ancora registrata per questa data.';
-    const players=P.map((p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`).join('');
+    const playerRow=(p,i)=>`<div class="player"><div class="av">${p.seq||i+1}</div><div class="meta"><b>${esc(p.n)}</b><br><small>${S.pres[p.id]?'Stato registrato':'Da registrare'}</small></div>${[['p','check'],['a','x'],['l','clock-3'],['u','minus']].map(x=>`<button class="sbtn ${S.pres[p.id]===x[0]?'on':''}" onclick='setPres(${JSON.stringify(String(p.id))},${JSON.stringify(x[0])})'><i data-lucide="${x[1]}"></i></button>`).join('')}</div>`;
+    const teamBlock=(team,label,klass)=>{
+      const list=P.filter(p=>matchTeams[p.id]===team),counts={p:0,a:0,l:0,u:0};
+      list.forEach(p=>{const x=S.pres[p.id];if(counts[x]!==undefined)counts[x]++});
+      return `<section class="attendance-team ${klass}"><div class="attendance-team-head"><div><span class="attendance-team-dot"></span><b>${label}</b></div><span class="pill ${team==='GIALLA'?'yellow':''}">${list.length} convocati</span></div><div class="attendance-team-stats"><span>${counts.p} presenti</span><span>${counts.a} assenti</span><span>${counts.l} ritardi</span><span>${counts.u} indisponibili</span></div>${list.length?list.map(playerRow).join(''):'<p class="muted">Nessun bambino assegnato a questo gruppo.</p>'}</section>`;
+    };
+    const players=attendanceMode==='match'?`${teamBlock('BLU','GRUPPO BLU','blue-team')}${teamBlock('GIALLA','GRUPPO GIALLO','yellow-team')}`:P.map(playerRow).join('');
+    const missingGroups=attendanceMode==='match'&&eventId&&!total?'<div class="card yellow"><b>Gruppi non ancora composti</b><p class="muted">Apri BLU / GIALLA e assegna i convocati alla partita. Le presenze saranno poi mostrate nei due gruppi.</p><button class="btn" onclick="go(\'builder\')"><i data-lucide="users-round"></i>Componi i gruppi</button></div>':'';
     const historyList=history.length?history.map(h=>`<button class="attendance-history-item" onclick='openAttendanceHistory(${JSON.stringify(h.event_date)},${JSON.stringify(h.event_type)})'><span class="attendance-history-icon ${h.event_type==='training'?'training':'match'}"><i data-lucide="${h.event_type==='training'?'dumbbell':'trophy'}"></i></span><span class="attendance-history-main"><b>${esc(h.title||(h.event_type==='training'?'Allenamento':'Partita'))}</b><small>${esc(dayLabel(h.event_date))}</small></span><span class="attendance-history-recap"><b>${h.counts.present+h.counts.late}/${h.total||P.length}</b><small>presenti</small></span><i data-lucide="chevron-right"></i></button>`).join(''):'<p class="muted">Nessuna attività svolta ancora disponibile.</p>';
-    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div><div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&!eventId?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div><div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">GIOCATORI · ${total}</div>${players}<div class="section">ATTIVITÀ SVOLTE</div><div class="card attendance-history">${historyList}</div>`;
+    return `${ttl('Presenze',`${kind} · ${fmt(currentDate)}${attendanceMode==='training'?' · 18:00–19:30':''}`)}<div class="card"><div class="tabs attendance-tabs"><button class="tab ${attendanceMode==='training'?'on':''}" onclick="setAttendanceMode('training')"><i data-lucide="dumbbell"></i>Allenamenti · mar/gio</button><button class="tab ${attendanceMode==='match'?'on':''}" onclick="setAttendanceMode('match')"><i data-lucide="trophy"></i>Partite · sab/dom</button></div><div class="attendance-date-row"><button class="sbtn" onclick="moveAttendanceDate(-1)" title="Giorno utile precedente"><i data-lucide="chevron-left"></i></button><div class="field attendance-date-field"><label>${kind}</label><select onchange="setAttendanceDate(this.value)">${options}</select></div><button class="sbtn" onclick="moveAttendanceDate(1)" title="Giorno utile successivo"><i data-lucide="chevron-right"></i></button></div><div class="attendance-day-badge ${attendanceMode}"><i data-lucide="${attendanceMode==='training'?'calendar-check':'calendar-days'}"></i>${esc(dayLabel(currentDate))}</div><div class="row" style="margin-top:10px"><button class="btn alt" onclick="markAllPresent()" ${attendanceMode==='match'&&(!eventId||!total)?'disabled':''}><i data-lucide="check-check"></i>Tutti presenti</button></div><p class="muted" style="margin-top:10px">${ready?message:'Caricamento presenze…'}</p></div>${missingGroups}<div class="grid g4"><div class="card"><b>Presenti</b><div class="kpi">${c.p}</div></div><div class="card"><b>Assenti</b><div class="kpi">${c.a}</div></div><div class="card"><b>Ritardo</b><div class="kpi">${c.l}</div></div><div class="card"><b>Indisponibili</b><div class="kpi">${c.u}</div></div></div><div class="section">${attendanceMode==='match'?'GRUPPI PARTITA':'GIOCATORI'} · ${total}</div>${players}<div class="section">ATTIVITÀ SVOLTE</div><div class="card attendance-history">${historyList}</div>`;
   };
 
   window.addEventListener('osgb-auth-ready',async e=>{
