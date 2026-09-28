@@ -1,4 +1,4 @@
-# OSGB Coach 2020
+# OSGB Coach
 
 Applicazione statica pubblicata tramite GitHub Pages, con archivio esercizi e autenticazione Supabase.
 
