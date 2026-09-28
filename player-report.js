@@ -11,11 +11,13 @@
   async function load(id){
     const [{data:p,error:pe},{data:a,error:ae},{data:c,error:ce}]=await Promise.all([
       client.from('players').select('id,first_name,last_name,birth_year,experience_level,development_level,development_notes').eq('id',id).maybeSingle(),
-      client.from('attendance').select('status,events!inner(event_date,title,event_type)').eq('player_id',id).gte('events.event_date',START).lte('events.event_date',END).order('updated_at',{ascending:false}),
-      client.from('callups').select('team_color,events!inner(event_date,title,event_type,opponent)').eq('player_id',id).gte('events.event_date',START).lte('events.event_date',END).order('created_at',{ascending:false})
+      client.from('attendance').select('status,events!inner(id,event_date,title,event_type)').eq('player_id',id).gte('events.event_date',START).lte('events.event_date',END).order('updated_at',{ascending:false}),
+      client.from('callups').select('team_color,events!inner(id,event_date,title,event_type,opponent)').eq('player_id',id).gte('events.event_date',START).lte('events.event_date',END).order('created_at',{ascending:false})
     ]);
     if(pe||ae||ce)throw pe||ae||ce;
-    const rows=a||[],calls=c||[];
+    const calls=c||[];
+    const called=new Set(calls.map(x=>String(x.events?.id)));
+    const rows=(a||[]).filter(x=>x.events?.event_type==='training'||called.has(String(x.events?.id)));
     const present=rows.filter(x=>x.status==='present'||x.status==='late').length;
     const absent=rows.filter(x=>x.status==='absent').length;
     const late=rows.filter(x=>x.status==='late').length;
