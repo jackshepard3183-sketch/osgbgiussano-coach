@@ -16,7 +16,10 @@
       client.from('training_sessions').select('duration_minutes,session_date,is_template').eq('is_template',false).gte('session_date',START).lte('session_date',END)
     ]);
     const err=pe||ee||ae||ce||se;if(err)throw err;
-    const pRows=players||[],aRows=attendance||[],cRows=callups||[],ev=events||[],tr=sessions||[];
+    const pRows=players||[],cRows=callups||[],ev=events||[],tr=sessions||[];
+    const trainingIds=new Set(ev.filter(x=>x.event_type==='training').map(x=>String(x.id)));
+    const called=new Set(cRows.map(x=>`${x.event_id}:${x.player_id}`));
+    const aRows=(attendance||[]).filter(x=>trainingIds.has(String(x.event_id))||called.has(`${x.event_id}:${x.player_id}`));
     const games=ev.filter(x=>x.event_type!=='training');
     const trainingDates=new Set(ev.filter(x=>x.event_type==='training'&&x.event_date).map(x=>String(x.event_date)));
     const team={
