@@ -14,7 +14,10 @@
       client.from('attendance').select('status,updated_at,events(id,event_date,title,event_type)').eq('player_id',id).order('updated_at',{ascending:false}),
       client.from('callups').select('team_color,created_at,events(id,event_date,title,event_type,opponent,observations,post_match_notes)').eq('player_id',id).order('created_at',{ascending:false})
     ]);
-    return {player,contacts:contacts||[],attendance:attendance||[],callups:callups||[]};
+    const calls=callups||[];
+    const called=new Set(calls.map(r=>String(r.events?.id)));
+    const validAttendance=(attendance||[]).filter(r=>r.events?.event_type==='training'||called.has(String(r.events?.id)));
+    return {player,contacts:contacts||[],attendance:validAttendance,callups:calls};
   }
 
   function contactsHtml(rows){
