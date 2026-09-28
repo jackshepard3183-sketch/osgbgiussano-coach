@@ -12,10 +12,15 @@
 
   async function loadStats(){
     if(!client)return;
-    const {data,error}=await client.from('attendance').select('player_id,status,event_id,updated_at,events(event_date,title,event_type)').order('updated_at',{ascending:false});
-    if(error){console.error('player stats load',error);return;}
+    const [{data,error},{data:callups,error:callupError}]=await Promise.all([
+      client.from('attendance').select('player_id,status,event_id,updated_at,events(event_date,title,event_type)').order('updated_at',{ascending:false}),
+      client.from('callups').select('player_id,event_id')
+    ]);
+    if(error||callupError){console.error('player stats load',error||callupError);return;}
+    const called=new Set((callups||[]).map(x=>`${x.event_id}:${x.player_id}`));
     const next={};for(const p of P)next[p.id]=empty();
     for(const r of (data||[])){
+      if(r.events?.event_type!=='training'&&!called.has(`${r.event_id}:${r.player_id}`))continue;
       const s=next[r.player_id]||(next[r.player_id]=empty());
       if(r.status==='present')s.present++; else if(r.status==='absent')s.absent++; else if(r.status==='late')s.late++; else if(r.status==='unavailable')s.unavailable++;
       s.total++;s.history.push({status:r.status,date:r.events?.event_date||r.updated_at,title:r.events?.title||'Allenamento'});
